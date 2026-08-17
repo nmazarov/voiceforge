@@ -1,0 +1,19 @@
+services:
+  livekit:
+    image: livekit/livekit-server:latest
+    command: --config /etc/livekit.yaml
+    network_mode: host
+    volumes:
+      - ./infra/livekit.yaml:/etc/livekit.yaml:ro
+    restart: unless-stopped
+  app:
+    build: .
+    env_file: .env
+    network_mode: host
+    volumes:
+      - voiceforge-data:/app/data
+    depends_on:
+      - livekit
+    restart: unless-stopped
+volumes:
+  voiceforge-data:
