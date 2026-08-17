@@ -1,1 +1,0 @@
-{"name":"@voiceforge/desktop","version":"0.2.0","private":true,"main":"main.cjs","scripts":{"start":"electron ../.."},"devDependencies":{"electron":"^43.2.0"}}

@@ -1,0 +1,8 @@
+{
+  "name":"voiceforge-client","productName":"VoiceForge","private":true,"version":"0.3.0",
+  "description":"VoiceForge desktop client for Windows and Linux","main":"desktop/main.cjs",
+  "workspaces":["app","desktop"],
+  "scripts":{"dev":"npm run dev -w @voiceforge/client-ui","desktop":"npm run build -w @voiceforge/client-ui && electron .","build:ui":"npm run build -w @voiceforge/client-ui","build:windows":"npm run build:ui && electron-builder --win nsis --x64","build:windows:portable":"npm run build:ui && electron-builder --win portable --x64","build:linux":"npm run build:ui && electron-builder --linux AppImage deb --x64","build:linux:appimage":"npm run build:ui && electron-builder --linux AppImage --x64","build:linux:deb":"npm run build:ui && electron-builder --linux deb --x64"},
+  "devDependencies":{"electron":"^43.2.0","electron-builder":"^26.15.6"},
+  "build":{"appId":"com.voiceforge.desktop","productName":"VoiceForge","asar":true,"directories":{"output":"release","buildResources":"assets"},"files":["desktop/**/*","app/dist/**/*","assets/**/*","package.json"],"win":{"target":[{"target":"nsis","arch":["x64"]}],"artifactName":"VoiceForge-Setup-${version}.${ext}"},"nsis":{"oneClick":false,"allowToChangeInstallationDirectory":true,"perMachine":false,"createDesktopShortcut":true,"createStartMenuShortcut":true,"shortcutName":"VoiceForge","uninstallDisplayName":"VoiceForge"},"linux":{"target":[{"target":"AppImage","arch":["x64"]},{"target":"deb","arch":["x64"]}],"category":"Network","artifactName":"VoiceForge-${version}-${arch}.${ext}","desktop":{"entry":{"Name":"VoiceForge","Comment":"Self-hosted voice, text and screen sharing client","Categories":"Network;AudioVideo;","Terminal":"false","Type":"Application"}}}}
+}

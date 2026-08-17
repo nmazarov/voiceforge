@@ -1,286 +1,112 @@
-# VoiceForge — полная инструкция по установке и тесту
+# VoiceForge — полная установка и тест
 
-Эта инструкция рассчитана на первый тест VoiceForge на Linux VPS и Windows ПК.
+## 1. VPS
 
-## 1. Что понадобится
+Ubuntu 22.04/24.04 или Debian 12/13. Для первого реального теста рекомендуется 4 vCPU, 8 GB RAM, публичный IPv4 и сеть 1 Gbps.
 
-Для первого теста рекомендуется VPS со следующей конфигурацией:
+Открой порты:
 
-- Ubuntu 22.04/24.04 или Debian 12;
-- 4 vCPU;
-- 8 GB RAM;
-- NVMe/SSD;
-- публичный IPv4;
-- стабильный UDP;
-- сеть 1 Gbit/s желательно.
+- `3001/tcp` — VoiceForge API;
+- `7880/tcp` — LiveKit signaling MVP;
+- `7881/tcp` — WebRTC fallback;
+- `50000-50100/udp` — WebRTC media.
 
-На Windows ПК достаточно Windows 10/11 x64.
-
-## 2. Подготовка VPS
-
-Подключись по SSH:
-
-```bash
-ssh root@YOUR_VPS_IP
-```
-
-Обнови систему:
-
-```bash
-apt update && apt upgrade -y
-apt install -y git curl ca-certificates
-```
-
-## 3. Установка VoiceForge
+## 2. Установка серверной части
 
 ```bash
 git clone https://github.com/nmazarov/voiceforge.git
-cd voiceforge
+cd voiceforge/server
 chmod +x install.sh
 sudo ./install.sh
 ```
 
-Установщик проверяет Docker, создаёт рабочую конфигурацию и запускает интерактивный серверный менеджер.
-
-После первого запуска панель можно открыть из любой директории:
+После этого панель запускается:
 
 ```bash
 voiceforge
 ```
 
-## 4. Панель управления VPS
+В ней доступны Install, Update, Start, Stop, Restart, Status, Logs, Settings, Backup и удаление контейнеров без удаления persistent data.
 
-В меню доступны:
-
-1. Установить / подготовить сервер
-2. Обновить проект
-3. Запустить
-4. Остановить
-5. Перезапустить
-6. Посмотреть статус
-7. Посмотреть логи
-8. Изменить настройки
-9. Создать резервную копию
-10. Удалить контейнеры
-
-Для обычной эксплуатации лучше пользоваться этой панелью вместо ручного ввода Docker-команд.
-
-## 5. Порты
-
-Для текущего MVP открой:
+Проверка API:
 
 ```bash
-ufw allow OpenSSH
-ufw allow 3001/tcp
-ufw allow 7880/tcp
-ufw allow 7881/tcp
-ufw allow 50000:50100/udp
-ufw --force enable
-ufw status
-```
-
-Если у VPS-провайдера есть внешний firewall/security group, открой те же порты и там.
-
-Для будущего production-режима с доменом будут отдельно настроены 80/443, WSS и TURN/TLS.
-
-## 6. Проверка сервера
-
-Проверь контейнеры через панель `voiceforge` → Status или вручную:
-
-```bash
-docker compose ps
-```
-
-Проверь API:
-
-```bash
-curl http://127.0.0.1:3001/api/health
+curl http://YOUR_VPS_IP:3001/api/health
 ```
 
 Ожидается JSON с `ok: true`.
 
-## 7. Windows-клиент
+## 3. Windows-клиент
 
-VoiceForge Windows Client — отдельное desktop-приложение. Интерфейс хранится внутри приложения; оно не открывает веб-сайт VPS как страницу.
+GitHub → Actions → `Build Desktop Clients` → последний успешный запуск → artifact `VoiceForge-Windows-x64`.
 
-Готовый `.exe` собирается GitHub Actions. В репозитории открой:
-
-`Actions → Build Windows Client → последний успешный run → Artifacts → VoiceForge-Windows`
-
-Скачай artifact, распакуй ZIP и запусти `VoiceForge-Setup-<version>.exe`.
-
-Если хочешь собрать самостоятельно на Windows:
+Локальная сборка:
 
 ```powershell
-git clone https://github.com/nmazarov/voiceforge.git
-cd voiceforge
+cd client
 npm install
 npm run build:windows
 ```
 
-Установщик появится в папке:
+Установи `VoiceForge-Setup-0.3.0.exe`.
 
-```text
-release\
-```
+## 4. Ubuntu / Debian
 
-## 8. Первое подключение Windows к VPS
+GitHub → Actions → `Build Desktop Clients` → artifact `VoiceForge-Linux-x64`.
 
-Запусти VoiceForge.
-
-На экране подключения укажи:
-
-```text
-http://YOUR_VPS_IP:3001
-```
-
-Нажми проверку/подключение. Адрес сервера сохраняется локально на ПК.
-
-После перехода на домен адрес будет выглядеть примерно так:
-
-```text
-https://voice.example.com
-```
-
-## 9. Создание аккаунтов
-
-На первом Windows-клиенте зарегистрируй первого пользователя. Первый пользователь становится администратором текущего VoiceForge-сервера.
-
-На втором ПК зарегистрируй другого пользователя.
-
-Аккаунты принадлежат только этому VPS и не требуют центрального VoiceForge-аккаунта.
-
-## 10. Первый тест
-
-Рекомендуемый сценарий:
-
-1. На ПК №1 подключись к VPS.
-2. Создай/зарегистрируй первый аккаунт.
-3. На ПК №2 подключись к тому же IP.
-4. Зарегистрируй второй аккаунт.
-5. Отправьте друг другу сообщения в `#general`.
-6. Оба войдите в голосовой канал `General`.
-7. Проверьте звук в обе стороны.
-8. Проверьте Mute.
-9. На одном ПК включите Screen Share.
-10. На втором проверьте изображение и голос одновременно.
-11. Повторите тест в канале `Gaming`.
-
-## 11. Если голос не работает
-
-Проверь:
+DEB:
 
 ```bash
-docker compose ps
-docker compose logs --tail=200 livekit
-ufw status
+sudo apt install ./VoiceForge-0.3.0-amd64.deb
 ```
 
-Убедись, что UDP 50000-50100 открыт также в firewall панели VPS-провайдера.
+AppImage:
 
-Также проверь, что публичный LiveKit URL/IP в конфигурации соответствует реальному адресу VPS.
-
-## 12. Если Windows-клиент не подключается
-
-С ПК проверь:
-
-```powershell
-curl http://YOUR_VPS_IP:3001/api/health
+```bash
+chmod +x VoiceForge-0.3.0-x86_64.AppImage
+./VoiceForge-0.3.0-x86_64.AppImage
 ```
 
-Если ответа нет — проблема между ПК и VPS/firewall.
+Локальная сборка:
 
-Если API отвечает, но приложение не подключается — смотри server logs через `voiceforge` → Logs.
+```bash
+cd client
+npm install
+npm run build:linux
+```
 
-## 13. Обновление сервера
+## 5. Первое подключение
 
-Открой:
+В VoiceForge введи `YOUR_VPS_IP:3001`. Клиент проверит `/api/health`, сохранит адрес локально и откроет авторизацию. Первый зарегистрированный пользователь становится администратором данного VPS.
+
+## 6. MVP-тест двух клиентов
+
+Проверь: регистрацию двух пользователей, текст, вход в один голосовой канал, звук в обе стороны, mute/unmute, переход между каналами, screen share, рестарт VPS и сохранение аккаунтов/сообщений после рестарта.
+
+## 7. Обновление
+
+На VPS:
 
 ```bash
 voiceforge
 ```
 
-Выбери `Update`.
+Выбери `Update`. Перед крупным обновлением сделай Backup.
 
-Менеджер должен сохранить пользовательские данные и `.env`, получить новую версию проекта и пересобрать необходимые контейнеры.
-
-Перед крупным обновлением рекомендуется сделать Backup.
-
-## 14. Резервная копия
-
-В панели выбери `Backup`.
-
-Критически важные данные для MVP:
-
-- SQLite database в data volume/директории;
-- `.env`;
-- LiveKit configuration.
-
-Не публикуй реальные `.env` и секреты в GitHub.
-
-## 15. Логи
-
-Через панель:
-
-```text
-voiceforge → Logs
-```
-
-Или вручную:
+## 8. Диагностика
 
 ```bash
-docker compose logs -f --tail=200
+cd voiceforge/server
+docker compose ps
+docker compose logs --tail=200
 ```
 
-## 16. Перезапуск
+Если текст работает, а голос нет — в первую очередь проверь UDP `50000-50100` и внешний firewall VPS-провайдера.
 
-Через панель выбери Restart или:
+## 9. Перед публичным production
 
-```bash
-docker compose restart
-```
+Нужны HTTPS/WSS, домен, TURN/TLS, rate limiting, Argon2/bcrypt, роли/permissions, monitoring, автоматические backups, code signing desktop-клиентов и auto-update.
 
-## 17. Полная остановка
+## 10. Процесс разработки
 
-```bash
-docker compose down
-```
-
-Данные в persistent volume/директории не должны удаляться обычным `down`.
-
-Не используй `docker compose down -v`, если хочешь сохранить базу.
-
-## 18. Что считать успешным MVP-тестом
-
-Тест успешен, если одновременно работают:
-
-- подключение двух Windows-клиентов к одному VPS;
-- локальная регистрация пользователей;
-- текстовые сообщения;
-- вход/выход из разных голосовых комнат;
-- двусторонний голос;
-- mute;
-- screen share;
-- перезапуск сервера без потери аккаунтов и сообщений;
-- повторное подключение клиентов после рестарта.
-
-## 19. Что нужно перед публичным production
-
-Перед публичным использованием потребуется отдельный hardening-этап:
-
-- домен;
-- HTTPS/WSS;
-- TURN/TLS;
-- production LiveKit deployment;
-- Argon2/bcrypt вместо MVP password storage;
-- ограничения регистрации/permissions;
-- rate limits;
-- monitoring/alerts;
-- автоматические backups;
-- Windows code signing;
-- auto-update desktop client;
-- нагрузочные тесты сети и CPU.
-
-## 20. Правило разработки проекта
-
-Изменения сначала собираются в законченный пакет и проверяются. Коммит/пуш выполняется только после явного согласования владельца проекта. Не создавать десятки мелких коммитов для промежуточных исправлений.
+Изменения сначала собираются в законченный пакет. Коммит и push выполняются только после явного разрешения владельца проекта.

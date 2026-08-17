@@ -1,7 +1,10 @@
 node_modules/
 dist/
+release/
+client/release/
 .env
 *.db
 *.db-shm
 *.db-wal
+server/backups/
 .DS_Store
