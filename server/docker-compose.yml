@@ -1,19 +1,26 @@
+name: voiceforge
 services:
+  app:
+    image: ${VOICEFORGE_SERVER_IMAGE:-ghcr.io/nmazarov/voiceforge-server:latest}
+    env_file:
+      - .env
+    network_mode: host
+    volumes:
+      - voiceforge-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:'+(process.env.APP_PORT||3001)+'/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
   livekit:
-    image: livekit/livekit-server:latest
+    image: ${LIVEKIT_IMAGE:-livekit/livekit-server:latest}
     command: --config /etc/livekit.yaml
     network_mode: host
     volumes:
       - ./infra/livekit.yaml:/etc/livekit.yaml:ro
     restart: unless-stopped
-  app:
-    build: .
-    env_file: .env
-    network_mode: host
-    volumes:
-      - voiceforge-data:/app/data
-    depends_on:
-      - livekit
-    restart: unless-stopped
 volumes:
   voiceforge-data:
+    name: voiceforge-data
