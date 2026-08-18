@@ -747,6 +747,229 @@ button:disabled {
   font-size: 9px;
   cursor: pointer;
 }
+
+/* Motion and live-state language shared by the whole client. */
+button,
+.channel,
+.personCard,
+.member,
+.voiceUser,
+.sourceCard,
+.message,
+.settingsModal,
+.sharePicker {
+  transition: transform 160ms ease, border-color 180ms ease, background-color 180ms ease,
+    box-shadow 180ms ease, color 180ms ease, opacity 180ms ease;
+}
+button:not(:disabled):hover,
+.channel:hover,
+.sourceCard:hover {
+  transform: translateY(-1px);
+}
+button:not(:disabled):active,
+.channel:active,
+.sourceCard:active {
+  transform: translateY(0) scale(0.97);
+}
+.message,
+.personCard,
+.remoteStreamCard,
+.localStreamPreview {
+  animation: vfEnter 240ms ease both;
+}
+.personCard:nth-child(2n) { animation-delay: 35ms; }
+.personCard:nth-child(3n) { animation-delay: 70ms; }
+@keyframes vfEnter {
+  from { opacity: 0; transform: translateY(7px) scale(0.985); }
+}
+
+.voiceUser.isStreaming {
+  margin: 2px 0;
+  border-radius: 9px;
+  background: rgba(239, 68, 68, 0.075);
+  color: #fff;
+}
+.voiceUser > span:not(.sidebarMic) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.userLiveBadge,
+.cardLiveBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid rgba(255, 73, 100, 0.55);
+  background: linear-gradient(135deg, #a51e3a, #68192c);
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: 0.45px;
+  box-shadow: 0 0 14px rgba(255, 43, 78, 0.16);
+}
+.userLiveBadge {
+  flex: 0 0 auto;
+  min-width: auto;
+  margin-left: auto;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 7px;
+  cursor: pointer;
+}
+.userLiveBadge.own { cursor: default; }
+.userLiveBadge.watching,
+.cardLiveBadge.watching {
+  border-color: #ff7890;
+  background: #d02a49;
+  box-shadow: 0 0 20px rgba(255, 43, 78, 0.32);
+}
+.userLiveBadge i,
+.cardLiveBadge i,
+.streamPreviewHead i {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 8px #fff;
+  animation: streamPulse 1.2s ease-in-out infinite;
+}
+.personCard.isStreaming {
+  position: relative;
+  padding-top: 38px;
+  border-color: rgba(255, 73, 100, 0.62);
+  background: radial-gradient(circle at 50% 0, rgba(180, 30, 60, 0.23), transparent 55%),
+    linear-gradient(145deg, #171c2a, #111521);
+  box-shadow: inset 0 0 0 1px rgba(255, 73, 100, 0.08), 0 0 22px rgba(239, 68, 68, 0.11);
+}
+.cardLiveBadge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  min-width: 0;
+  min-height: 22px;
+  padding: 5px 7px;
+  border-radius: 7px;
+  font-size: clamp(6px, 0.65vw, 8px);
+  line-height: 1.2;
+  text-align: center;
+}
+button.cardLiveBadge { cursor: pointer; }
+
+.localStreamPreview {
+  margin-top: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 73, 100, 0.42);
+  border-radius: 13px;
+  background: #070910;
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.28);
+}
+.streamPreviewHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 11px;
+  background: linear-gradient(90deg, rgba(124, 21, 44, 0.88), rgba(45, 17, 35, 0.88));
+}
+.streamPreviewHead span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+}
+.streamPreviewHead small {
+  min-width: 0;
+  overflow: hidden;
+  color: #ffbdc7;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.streamPreviewHead button {
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+  margin-left: auto;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.2);
+  color: #fff;
+  cursor: pointer;
+}
+.localStreamPreview:not(:has(.streamPreviewViewport)) {
+  background: transparent;
+}
+.qualityPicker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 14px;
+  border: 1px solid #292e44;
+  border-radius: 11px;
+  background: #111521;
+}
+.qualityPicker > div:first-child { min-width: 0; }
+.qualityPicker b,
+.qualityPicker small { display: block; }
+.qualityPicker > div:first-child b { font-size: 10px; }
+.qualityPicker > div:first-child small { margin-top: 3px; color: #747e97; font-size: 8px; }
+.qualityOptions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(58px, 1fr));
+  gap: 5px;
+  flex: 0 1 245px;
+}
+.qualityOptions button {
+  padding: 6px 8px;
+  border: 1px solid #30374f;
+  border-radius: 8px;
+  background: #181d2b;
+  color: #adb5c9;
+  cursor: pointer;
+}
+.qualityOptions button.active {
+  border-color: #8f67ed;
+  background: linear-gradient(145deg, #4d328a, #2d2350);
+  color: #fff;
+  box-shadow: 0 0 15px rgba(124, 58, 237, 0.18);
+}
+.qualityOptions button b { font-size: 9px; }
+.qualityOptions button small { margin-top: 2px; color: #8992a8; font-size: 6px; }
+.remoteStreamCard .fullscreenStream {
+  border-color: #39445f;
+  background: #202738;
+}
+.media video:fullscreen {
+  width: 100vw;
+  height: 100vh;
+  max-height: none;
+  border-radius: 0;
+  object-fit: contain;
+  background: #000;
+}
+.streamPreviewViewport {
+  display: grid;
+  width: 100%;
+  max-height: min(42vh, 430px);
+  aspect-ratio: 16 / 9;
+  place-items: center;
+  overflow: hidden;
+  resize: vertical;
+}
+.streamPreviewViewport video {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  object-fit: contain;
+  background: #05070c;
+}
 .remoteStreamCard.watching button {
   border-color: #8a3548;
   background: #572330;
@@ -861,6 +1084,7 @@ button:disabled {
   white-space: normal;
 }
 .media video {
+  height: auto;
   max-width: 100%;
 }
 .composer input {
@@ -882,6 +1106,24 @@ button:disabled {
 .settingsBody > main,
 .sourceGrid {
   overscroll-behavior: contain;
+}
+
+@media (max-width: 680px) {
+  .peopleGrid { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+  .personCard { min-height: 150px; }
+  .remoteStreamCard button { width: 100%; }
+  .streamPreviewViewport { max-height: 34vh; }
+  .qualityPicker { align-items: stretch; flex-direction: column; }
+  .qualityOptions { flex-basis: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 .settingField > span,
 .settingToggle > span,
@@ -992,4 +1234,88 @@ button:disabled {
     grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
     padding: 12px;
   }
+}
+
+/* Readability pass: local Manrope with larger, calmer interface typography. */
+html,
+body,
+#root,
+button,
+input,
+select,
+textarea {
+  font-family: "Manrope Variable", Manrope, system-ui, sans-serif;
+}
+body { font-size: 14px; }
+.logo strong { font-size: 17px; }
+.logo small,
+.serverHead small,
+.eyebrow,
+.section,
+.node small { font-size: 9px; }
+.serverHead b,
+.channel,
+.profile b,
+.stageHead b,
+.meta b,
+.member b,
+.node b { font-size: 13px; }
+.profile small,
+.title small,
+.stageHead small,
+.member small,
+.node span,
+.connectionBadge,
+.voiceStatus small,
+.callControls small { font-size: 10px; }
+.title b { font-size: 15px; }
+.message p,
+.composer input { font-size: 14px; }
+.personCard b,
+.remoteStreamCard b,
+.sourceCard b { font-size: 12px; }
+.remoteStreamCard small,
+.streamLiveBanner span,
+.streamPreviewHead small { font-size: 10px; }
+.streamLiveBanner b,
+.streamPreviewHead span { font-size: 11px; }
+.voiceUser { font-size: 11px; }
+.sidebarMic { font-size: 11px; }
+.userLiveBadge { font-size: 8px; }
+.cardLiveBadge { font-size: clamp(8px, 0.72vw, 10px); }
+.toast { font-size: 12px; }
+
+/* Screen picker: balanced spacing and four explicit quality presets. */
+.sharePicker {
+  width: min(1040px, 94vw);
+  max-height: min(90vh, 820px);
+}
+.sharePicker > header { padding: 22px 24px; }
+.sharePicker h2 { font-size: 21px; line-height: 1.25; }
+.sharePicker p { font-size: 11px; line-height: 1.45; }
+.sourceTabs { padding: 15px 22px 0; }
+.sourceTabs button { min-height: 36px; padding: 9px 15px; font-size: 11px; }
+.qualityPicker {
+  margin: 13px 22px 0;
+  padding: 13px 14px;
+}
+.qualityPicker > div:first-child b { font-size: 12px; }
+.qualityPicker > div:first-child small { font-size: 9px; line-height: 1.4; }
+.qualityOptions {
+  grid-template-columns: repeat(4, minmax(72px, 1fr));
+  flex-basis: 360px;
+}
+.qualityOptions button { min-height: 45px; padding: 7px 9px; }
+.qualityOptions button b { font-size: 11px; }
+.qualityOptions button small { font-size: 8px; }
+.sourceGrid {
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 14px;
+  padding: 16px 22px 24px;
+}
+.sourceCard > span { min-height: 42px; padding: 11px 12px; }
+
+@media (max-width: 760px) {
+  .qualityOptions { grid-template-columns: repeat(2, minmax(90px, 1fr)); }
+  .sourceGrid { grid-template-columns: 1fr; }
 }
