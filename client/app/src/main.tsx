@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import "@fontsource-variable/manrope";
 import {
   ConnectionState,
   Room,
   RoomEvent,
   Track,
+  LocalTrack,
   RemoteTrack,
   RemoteParticipant,
 } from "livekit-client";
@@ -37,6 +39,13 @@ type RemoteStreamState = {
 };
 type CallStatus = "idle" | "connecting" | "connected" | "reconnecting";
 type StreamStatus = "idle" | "selecting" | "starting" | "live" | "stopping";
+type StreamQuality = "720p30" | "720p60" | "1080p30" | "1080p60";
+const streamQualities: Record<StreamQuality, { label: string; width: number; height: number; frameRate: number; bitrate: number }> = {
+  "720p30": { label: "720p · 30 FPS", width: 1280, height: 720, frameRate: 30, bitrate: 2_500_000 },
+  "720p60": { label: "720p · 60 FPS", width: 1280, height: 720, frameRate: 60, bitrate: 4_000_000 },
+  "1080p30": { label: "1080p · 30 FPS", width: 1920, height: 1080, frameRate: 30, bitrate: 5_000_000 },
+  "1080p60": { label: "1080p · 60 FPS", width: 1920, height: 1080, frameRate: 60, bitrate: 8_000_000 },
+};
 type ClientSettings = {
   language: "ru" | "en";
   inputDevice: string;
@@ -194,6 +203,44 @@ function useClickSounds() {
   }, []);
 }
 
+function StreamPreview({
+  track,
+  title,
+  subtitle,
+  open,
+  onToggle,
+}: {
+  track: LocalTrack;
+  title: string;
+  subtitle: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const previewRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const video = track.attach();
+    video.muted = true;
+    video.autoplay = true;
+    video.setAttribute("playsinline", "true");
+    previewRef.current?.appendChild(video);
+    return () => {
+      track.detach(video);
+      video.remove();
+    };
+  }, [track, open]);
+  return (
+    <section className="localStreamPreview">
+      <div className="streamPreviewHead">
+        <span><i />{title}</span>
+        <small>{subtitle}</small>
+        <button onClick={onToggle}>{open ? "−" : "□"}</button>
+      </div>
+      {open && <div className="streamPreviewViewport" ref={previewRef} />}
+    </section>
+  );
+}
+
 function App() {
   useClickSounds();
   const [server, setServer] = useState(API()),
@@ -215,6 +262,9 @@ function App() {
     [callStatus, setCallStatus] = useState<CallStatus>("idle"),
     [streamStatus, setStreamStatus] = useState<StreamStatus>("idle"),
     [streamSource, setStreamSource] = useState(""),
+    [streamQuality, setStreamQuality] = useState<StreamQuality>("1080p30"),
+    [previewOpen, setPreviewOpen] = useState(true),
+    [localStreamTrack, setLocalStreamTrack] = useState<LocalTrack | null>(null),
     [connectError, setConnectError] = useState(false);
   const [sources, setSources] = useState<DesktopSource[]>([]),
     [sourceLoading, setSourceLoading] = useState(false),
@@ -333,6 +383,7 @@ function App() {
     setCallStatus("idle");
     setStreamStatus("idle");
     setStreamSource("");
+    setLocalStreamTrack(null);
     setSources([]);
     if (mediaRef.current) mediaRef.current.innerHTML = "";
   }
@@ -462,12 +513,14 @@ function App() {
         if (publication.source !== Track.Source.ScreenShare) return;
         setSharing(true);
         setStreamStatus("live");
+        setLocalStreamTrack((publication.track as LocalTrack | undefined) || null);
       });
       next.on(RoomEvent.LocalTrackUnpublished, (publication) => {
         if (publication.source !== Track.Source.ScreenShare) return;
         setSharing(false);
         setStreamStatus("idle");
         setStreamSource("");
+        setLocalStreamTrack(null);
       });
       next.on(
         RoomEvent.TrackSubscribed,
@@ -632,6 +685,8 @@ function App() {
     if (stream.video) {
       const video = stream.video.attach();
       video.dataset.voiceforgeStream = stream.id;
+      video.title = en ? "Double-click for fullscreen" : "Двойной щелчок — на весь экран";
+      video.ondblclick = () => void video.requestFullscreen();
       mediaRef.current?.appendChild(video);
     }
     if (stream.audio) {
@@ -641,6 +696,15 @@ function App() {
       audio.muted = deafenedRef.current;
       audio.volume = settings.outputVolume / 100;
       document.body.appendChild(audio);
+    }
+  }
+  async function fullscreenRemoteStream(id: string) {
+    const video = document.querySelector<HTMLVideoElement>(`video[data-voiceforge-stream="${CSS.escape(id)}"]`);
+    if (!video) return;
+    try {
+      await video.requestFullscreen();
+    } catch {
+      setNotice(en ? "Fullscreen mode is unavailable" : "Полноэкранный режим недоступен");
     }
   }
   function toggleRemoteStream(id: string) {
@@ -707,7 +771,7 @@ function App() {
       setSourceLoading(false);
     }
   }
-  async function startShare(source: DesktopSource) {
+  async function startShare(source: DesktopSource, quality: StreamQuality) {
     if (!room || !bridge) return;
     setStreamStatus("starting");
     setStreamSource(source.name);
@@ -715,7 +779,14 @@ function App() {
     try {
       await waitForMediaConnection(room);
       await bridge.selectScreenSource(source.id);
-      await room.localParticipant.setScreenShareEnabled(true, { audio: true });
+      const preset = streamQualities[quality];
+      await room.localParticipant.setScreenShareEnabled(
+        true,
+        { audio: true, resolution: { width: preset.width, height: preset.height, frameRate: preset.frameRate } },
+        { videoEncoding: { maxBitrate: preset.bitrate, maxFramerate: preset.frameRate } },
+      );
+      setStreamQuality(quality);
+      setPreviewOpen(true);
       playSound("stream");
       setSources([]);
       setNotice(`${en ? "Screen sharing started" : "Трансляция запущена"}: ${source.name}`);
@@ -879,9 +950,25 @@ function App() {
               </button>
               {voice === channel.name &&
                 participants.map((participant) => (
-                  <div className="voiceUser" key={participant}>
+                  <div
+                    className={`voiceUser ${remoteStreams.some((stream) => stream.name === participant && stream.video) || (participant === username && streamStatus === "live") ? "isStreaming" : ""}`}
+                    key={participant}
+                  >
                     <Avatar name={participant} small />
                     <span>{participant}</span>
+                    {participant === username && streamStatus === "live" && (
+                      <span className="userLiveBadge own"><i />{en ? "LIVE" : "ЭФИР"}</span>
+                    )}
+                    {remoteStreams.filter((stream) => stream.name === participant && stream.video).map((stream) => (
+                      <button
+                        className={`userLiveBadge ${stream.watching ? "watching" : ""}`}
+                        key={stream.id}
+                        onClick={() => toggleRemoteStream(stream.id)}
+                        title={en ? `Watch ${participant}'s stream` : `Смотреть трансляцию ${participant}`}
+                      >
+                        <i />{stream.watching ? (en ? "WATCHING" : "СМОТРИМ") : (en ? "LIVE" : "ЭФИР")}
+                      </button>
+                    ))}
                     <span
                       className={`sidebarMic ${participantStates[participant]?.mic ? "on" : "off"}`}
                       title={participantStates[participant]?.mic ? (en ? "Microphone on" : "Микрофон включён") : (en ? "Microphone off" : "Микрофон выключен")}
@@ -1011,9 +1098,23 @@ function App() {
             <div className="peopleGrid">
               {participants.map((participant, index) => (
                 <div
-                  className={`personCard ${participantStates[participant]?.speaking ? "speaking" : ""} ${participantStates[participant]?.mic ? "micEnabled" : "micDisabled"}`}
+                  className={`personCard ${participantStates[participant]?.speaking ? "speaking" : ""} ${participantStates[participant]?.mic ? "micEnabled" : "micDisabled"} ${remoteStreams.some((stream) => stream.name === participant && stream.video) || (participant === username && streamStatus === "live") ? "isStreaming" : ""}`}
                   key={participant}
                 >
+                  {participant === username && streamStatus === "live" && (
+                    <span className="cardLiveBadge"><i />{en ? "YOU ARE LIVE" : "ВЫ В ЭФИРЕ"}</span>
+                  )}
+                  {remoteStreams.filter((stream) => stream.name === participant && stream.video).map((stream) => (
+                    <button
+                      className={`cardLiveBadge clickable ${stream.watching ? "watching" : ""}`}
+                      key={stream.id}
+                      onClick={() => toggleRemoteStream(stream.id)}
+                    >
+                      <i />{stream.watching
+                        ? (en ? "WATCHING — CLICK TO CLOSE" : "СМОТРИМ — НАЖМИТЕ, ЧТОБЫ ЗАКРЫТЬ")
+                        : (en ? "LIVE — CLICK TO WATCH" : "ИДЁТ ТРАНСЛЯЦИЯ — НАЖМИТЕ, ЧТОБЫ СМОТРЕТЬ")}
+                    </button>
+                  ))}
                   <Avatar name={participant} large />
                   <b>{participant}</b>
                   <div className="voiceStatus">
@@ -1032,6 +1133,15 @@ function App() {
                 </div>
               ))}
             </div>
+            {streamStatus === "live" && localStreamTrack && (
+              <StreamPreview
+                track={localStreamTrack}
+                title={en ? "Your stream preview" : "Предпросмотр вашей трансляции"}
+                subtitle={`${streamSource || (en ? "Screen sharing" : "Демонстрация экрана")} · ${streamQualities[streamQuality].label}`}
+                open={previewOpen}
+                onToggle={() => setPreviewOpen((current) => !current)}
+              />
+            )}
             {remoteStreams.some((stream) => stream.video) && (
               <div className="remoteStreams">
                 {remoteStreams.filter((stream) => stream.video).map((stream) => (
@@ -1048,6 +1158,11 @@ function App() {
                         ? en ? "Stop watching" : "Закрыть трансляцию"
                         : en ? "Watch stream" : "Смотреть трансляцию"}
                     </button>
+                    {stream.watching && (
+                      <button className="fullscreenStream" onClick={() => void fullscreenRemoteStream(stream.id)}>
+                        ⛶ {en ? "Fullscreen" : "На весь экран"}
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1180,7 +1295,7 @@ function App() {
           sources={sources}
           busy={sourceLoading}
           language={settings.language}
-          onSelect={(source) => void startShare(source)}
+          onSelect={(source, quality) => void startShare(source, quality)}
           onClose={() => setSources([])}
         />
       )}
@@ -1232,7 +1347,7 @@ function SharePicker({
   sources: DesktopSource[];
   busy: boolean;
   language: "ru" | "en";
-  onSelect: (source: DesktopSource) => void;
+  onSelect: (source: DesktopSource, quality: StreamQuality) => void;
   onClose: () => void;
 }) {
   const en = language === "en";
@@ -1240,6 +1355,7 @@ function SharePicker({
     ? "screen"
     : "window";
   const [tab, setTab] = useState<"screen" | "window">(initial);
+  const [quality, setQuality] = useState<StreamQuality>("1080p30");
   const visible = sources.filter((source) => source.kind === tab);
   return (
     <div
@@ -1270,12 +1386,30 @@ function SharePicker({
             {en ? "Application windows" : "Окна приложений"}
           </button>
         </div>
+        <div className="qualityPicker">
+          <div>
+            <b>{en ? "Stream quality" : "Качество трансляции"}</b>
+            <small>{en ? "Higher quality requires faster upload" : "Высокое качество требует более быстрой отдачи"}</small>
+          </div>
+          <div className="qualityOptions">
+            {(Object.keys(streamQualities) as StreamQuality[]).map((value) => (
+              <button
+                className={quality === value ? "active" : ""}
+                key={value}
+                onClick={() => setQuality(value)}
+              >
+                <b>{streamQualities[value].label.split(" · ")[0]}</b>
+                <small>{streamQualities[value].frameRate} FPS</small>
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="sourceGrid">
           {visible.map((source) => (
             <button
               className="sourceCard"
               key={source.id}
-              onClick={() => onSelect(source)}
+              onClick={() => onSelect(source, quality)}
               disabled={busy}
             >
               <img src={source.thumbnail} alt="" />
