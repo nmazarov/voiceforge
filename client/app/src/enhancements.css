@@ -1,0 +1,995 @@
+.unavailable,
+button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed !important;
+}
+.charCount {
+  color: #69738b;
+  font-size: 8px;
+  margin-right: 7px;
+}
+.toast {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 1000;
+  max-width: 420px;
+  padding: 12px 16px;
+  border: 1px solid #4b3b79;
+  border-radius: 11px;
+  background: #19152a;
+  color: #e9e2ff;
+  box-shadow: 0 16px 50px #0009;
+  font-size: 11px;
+}
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(3, 5, 10, 0.82);
+  backdrop-filter: blur(8px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.sharePicker {
+  width: min(980px, 94vw);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #303955;
+  border-radius: 19px;
+  background: #10141f;
+  box-shadow: 0 30px 100px #000c;
+  overflow: hidden;
+}
+.sharePicker > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  padding: 20px 22px;
+  border-bottom: 1px solid #242c40;
+}
+.sharePicker h2 {
+  font-size: 18px;
+  margin: 0;
+}
+.sharePicker p {
+  font-size: 10px;
+  color: #838da5;
+  margin: 6px 0 0;
+}
+.sharePicker > header button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #333c55;
+  border-radius: 9px;
+  background: #191e2c;
+  color: #b7c0d4;
+  font-size: 20px;
+}
+.sourceTabs {
+  display: flex;
+  gap: 7px;
+  padding: 14px 20px 0;
+}
+.sourceTabs button {
+  border: 1px solid #2b3349;
+  border-radius: 9px;
+  padding: 9px 13px;
+  background: #171b29;
+  color: #8f99b0;
+  font-size: 10px;
+}
+.sourceTabs button.active {
+  background: #302551;
+  border-color: #7558c5;
+  color: #fff;
+}
+.sourceGrid {
+  padding: 16px 20px 22px;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 13px;
+}
+.sourceCard {
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  border: 1px solid #2a3248;
+  border-radius: 12px;
+  background: #151925;
+  color: #dce2ef;
+  transition: 0.15s;
+}
+.sourceCard:hover {
+  transform: translateY(-2px);
+  border-color: #7455c5;
+  box-shadow: 0 9px 28px #0007;
+}
+.sourceCard > img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  background: #070910;
+}
+.sourceCard > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+}
+.sourceCard > span img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+.sourceCard b {
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.noSources {
+  grid-column: 1/-1;
+  text-align: center;
+  padding: 40px;
+}
+.composer .send:disabled {
+  background: #30364a;
+}
+.withoutMembers {
+  grid-template-columns: 74px 270px minmax(520px, 1fr);
+}
+.membersCollapsed {
+  display: none;
+}
+.headerBtns {
+  position: relative;
+}
+.headerBtns button.active {
+  background: #302551;
+  border-color: #7656ce;
+  color: #fff;
+}
+.moreMenu {
+  position: absolute;
+  right: 0;
+  top: 40px;
+  z-index: 80;
+  width: 190px;
+  padding: 7px;
+  border: 1px solid #30384e;
+  border-radius: 11px;
+  background: #111622;
+  box-shadow: 0 18px 45px #000b;
+}
+.moreMenu button {
+  width: 100%;
+  height: auto;
+  padding: 10px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: #bdc5d7;
+  font-size: 10px;
+}
+.moreMenu button:hover {
+  background: #20263a;
+  color: #fff;
+}
+.searchBar {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 18px;
+  border-bottom: 1px solid #242b40;
+  background: #101521;
+}
+.searchBar input {
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #eef1ff;
+  font-size: 12px;
+}
+.searchBar button {
+  border: 0;
+  background: transparent;
+  color: #8993aa;
+  font-size: 18px;
+}
+.settingsModal {
+  width: min(1080px, 95vw);
+  height: min(850px, 92vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #303955;
+  border-radius: 20px;
+  background: #0e121c;
+  box-shadow: 0 35px 120px #000d;
+}
+.settingsModal > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #242c40;
+}
+.settingsModal h2 {
+  margin: 0;
+  font-size: 19px;
+}
+.settingsModal header p {
+  margin: 5px 0 0;
+  color: #7d879e;
+  font-size: 10px;
+}
+.settingsModal > header > button {
+  width: 35px;
+  height: 35px;
+  border: 1px solid #30394f;
+  border-radius: 9px;
+  background: #191e2c;
+  color: #aeb7ca;
+  font-size: 20px;
+}
+.settingsBody {
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  min-height: 0;
+  flex: 1;
+}
+.settingsBody > nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 12px;
+  border-right: 1px solid #242c40;
+  background: #0b0f17;
+}
+.settingsBody > nav button,
+.settingsBody > nav span {
+  display: block;
+  padding: 11px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #78839a;
+  text-align: left;
+  font-size: 10px;
+}
+.settingsBody > nav .active {
+  background: #282047;
+  color: #e0d6ff;
+}
+.settingsBody > main {
+  overflow: auto;
+  padding: 22px 28px;
+}
+.settingsSection {
+  padding: 0 0 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid #222a3d;
+}
+.settingsSection:last-child {
+  border: 0;
+}
+.settingsSection h3 {
+  font-size: 13px;
+  margin: 0 0 14px;
+}
+.settingField {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  align-items: center;
+  margin: 10px 0;
+  color: #9da7bc;
+  font-size: 10px;
+}
+.settingField select {
+  height: 40px;
+  border: 1px solid #303950;
+  border-radius: 9px;
+  padding: 0 10px;
+  background: #141925;
+  color: #e8ebf4;
+}
+.settingRange {
+  display: block;
+  margin: 16px 0;
+}
+.settingRange > span {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.settingRange b {
+  font-size: 10px;
+}
+.settingRange em {
+  font-style: normal;
+  color: #8e78d6;
+  font-size: 10px;
+}
+.settingRange input {
+  width: 100%;
+  accent-color: #7c3aed;
+}
+.settingToggle {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 11px 0;
+  cursor: pointer;
+}
+.settingToggle > span {
+  flex: 1;
+}
+.settingToggle b,
+.settingToggle small {
+  display: block;
+}
+.settingToggle b {
+  font-size: 11px;
+}
+.settingToggle small {
+  font-size: 9px;
+  color: #737e95;
+  margin-top: 4px;
+}
+.settingToggle input {
+  position: absolute;
+  opacity: 0;
+}
+.settingToggle > i {
+  width: 38px;
+  height: 21px;
+  border-radius: 999px;
+  background: #30384b;
+  position: relative;
+  transition: 0.2s;
+}
+.settingToggle > i:after {
+  content: "";
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  left: 3px;
+  top: 3px;
+  border-radius: 50%;
+  background: #929caf;
+  transition: 0.2s;
+}
+.settingToggle input:checked + i {
+  background: #6d3fe0;
+}
+.settingToggle input:checked + i:after {
+  left: 20px;
+  background: white;
+}
+.secondaryButton,
+.micTest button {
+  border: 1px solid #333c53;
+  border-radius: 9px;
+  padding: 9px 12px;
+  background: #191e2c;
+  color: #bbc4d7;
+  font-size: 10px;
+}
+.settingsError {
+  color: #ff808d;
+  font-size: 9px;
+}
+.micTest {
+  display: grid;
+  grid-template-columns: 170px 1fr auto;
+  align-items: center;
+  gap: 15px;
+  padding: 14px;
+  border: 1px solid #2b3348;
+  border-radius: 12px;
+  background: #121722;
+}
+.micTest b,
+.micTest small {
+  display: block;
+}
+.micTest b {
+  font-size: 10px;
+}
+.micTest small {
+  font-size: 8px;
+  color: #727d94;
+  margin-top: 4px;
+}
+.levelTrack {
+  height: 8px;
+  border-radius: 99px;
+  background: #272e40;
+  overflow: hidden;
+}
+.levelTrack i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #32d583, #e7d34f, #ef5656);
+  transition: width 0.06s;
+}
+.settingsModal > footer {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 14px 20px;
+  border-top: 1px solid #242c40;
+  background: #0b0f17;
+}
+.settingsModal > footer span {
+  flex: 1;
+}
+.settingsModal > footer button {
+  border: 1px solid #333c53;
+  border-radius: 9px;
+  padding: 10px 14px;
+  background: #181d2b;
+  color: #b8c1d4;
+  font-size: 10px;
+}
+.settingsModal > footer .saveButton {
+  border: 0;
+  background: linear-gradient(100deg, #6630e4, #285ee9);
+  color: #fff;
+}
+.settingsModal > footer .resetButton {
+  color: #ff8e99;
+}
+.authGate {
+  grid-template-columns: 1fr !important;
+}
+.authPanel {
+  width: min(460px, 92vw);
+  padding: 32px 34px;
+}
+.authPanel h1 {
+  font-size: 25px;
+}
+.authPanel label:not(.rememberRow),
+.connectBox label {
+  font-size: 9px;
+}
+.field {
+  height: 47px;
+  font-size: 13px;
+}
+.primary {
+  height: 47px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.rememberRow {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  margin: -1px 0 14px !important;
+  color: #c3cadb !important;
+  font-size: 11px !important;
+  letter-spacing: 0 !important;
+  cursor: pointer;
+}
+.rememberRow input {
+  width: 17px;
+  height: 17px;
+  accent-color: #7c3aed;
+}
+.rememberRow span,
+.rememberRow b,
+.rememberRow small {
+  display: block;
+}
+.rememberRow small {
+  font-size: 8px;
+  color: #707b93;
+  margin-top: 2px;
+}
+.sessionLoading {
+  height: 100vh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 18px;
+  background: radial-gradient(circle at 50% 20%, #251653, #090b12 48%);
+  color: #8e98b0;
+  font-size: 11px;
+}
+.sessionLoading .logo {
+  transform: scale(1.1);
+}
+.languageSwitch {
+  position: fixed;
+  z-index: 20;
+  top: 20px;
+  right: 22px;
+  display: flex;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid #30384e;
+  border-radius: 10px;
+  background: rgba(12, 15, 24, 0.9);
+}
+.languageSwitch button {
+  width: 38px;
+  height: 28px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #78839b;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.languageSwitch button.active {
+  background: #6536d8;
+  color: white;
+}
+.shell {
+  grid-template-columns: 74px 270px minmax(520px, 1fr) 270px;
+}
+.sidebar,
+.members {
+  padding: 20px 14px 14px;
+}
+.channel {
+  padding: 11px 11px;
+  font-size: 13px;
+}
+.section {
+  font-size: 10px;
+  padding-top: 21px;
+}
+.serverHead b {
+  font-size: 13px;
+}
+.profile {
+  padding: 11px;
+}
+.profile b {
+  font-size: 12px;
+}
+.profile small {
+  font-size: 9px;
+}
+.logoutButton {
+  width: 31px;
+  height: 31px;
+  border: 1px solid #30384e;
+  border-radius: 9px;
+  background: #181d2b;
+  color: #aab3c7;
+  cursor: pointer;
+}
+.content > header {
+  height: 66px;
+}
+.title b {
+  font-size: 14px;
+}
+.title small {
+  font-size: 9px;
+}
+.messages {
+  padding: 24px;
+}
+.message {
+  grid-template-columns: 39px 1fr;
+  gap: 11px;
+  padding: 10px 0;
+}
+.meta b {
+  font-size: 12px;
+}
+.meta small {
+  font-size: 9px;
+}
+.message p {
+  font-size: 13px;
+  line-height: 1.55;
+}
+.composer {
+  margin: 0 22px 20px;
+  padding: 7px;
+}
+.composer input {
+  font-size: 13px;
+}
+.callControls button {
+  height: 44px;
+  min-width: 86px;
+  cursor: pointer;
+}
+.callControls small {
+  font-size: 9px;
+}
+.streamLiveBanner {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: -2px -2px 12px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 77, 102, 0.45);
+  border-radius: 11px;
+  background: linear-gradient(90deg, rgba(111, 24, 44, 0.78), rgba(54, 20, 48, 0.58));
+  box-shadow: 0 0 24px rgba(239, 68, 68, 0.13);
+}
+.streamLiveBanner i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ff4964;
+  box-shadow: 0 0 0 5px rgba(255, 73, 100, 0.12), 0 0 14px #ff4964;
+  animation: streamPulse 1.3s ease-in-out infinite;
+}
+.streamLiveBanner b {
+  color: #fff;
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+.streamLiveBanner span {
+  min-width: 0;
+  overflow: hidden;
+  color: #ffbdc7;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.connectionBadge {
+  background: rgba(50, 213, 131, 0.1) !important;
+  border-color: rgba(50, 213, 131, 0.28) !important;
+  color: #79e8af !important;
+}
+.connectionBadge.reconnecting,
+.connectionBadge.connecting {
+  background: rgba(245, 158, 11, 0.1) !important;
+  border-color: rgba(245, 158, 11, 0.3) !important;
+  color: #f8c76d !important;
+}
+.callControls button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+@keyframes streamPulse {
+  50% { opacity: 0.48; transform: scale(0.82); }
+}
+.personCard b {
+  font-size: 11px;
+}
+.personCard.micEnabled .avatar {
+  border-color: #36d98b;
+  box-shadow: 0 0 0 3px rgba(54, 217, 139, 0.1), 0 0 19px rgba(54, 217, 139, 0.22);
+}
+.personCard.micDisabled .meter {
+  opacity: 0.12;
+}
+.personCard.micDisabled .avatar {
+  filter: saturate(0.45);
+}
+.voiceStatus {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #778198;
+}
+.voiceStatus .micState {
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: #2a1a22;
+  font-size: 10px;
+}
+.micEnabled .voiceStatus .micState {
+  background: rgba(50, 213, 131, 0.15);
+  color: #49df95;
+  box-shadow: 0 0 10px rgba(50, 213, 131, 0.22);
+}
+.voiceStatus small {
+  font-size: 8px;
+}
+.sidebarMic {
+  margin-left: auto;
+  font-size: 10px;
+  opacity: 0.42;
+}
+.sidebarMic.on {
+  color: #45df94;
+  opacity: 1;
+  filter: drop-shadow(0 0 5px rgba(69, 223, 148, 0.7));
+}
+.remoteStreams {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+.remoteStreamCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 73, 100, 0.3);
+  border-radius: 11px;
+  background: linear-gradient(90deg, rgba(66, 20, 37, 0.66), rgba(27, 19, 40, 0.7));
+}
+.remoteStreamCard > div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.remoteStreamCard p,
+.remoteStreamCard b,
+.remoteStreamCard small {
+  display: block;
+  margin: 0;
+}
+.remoteStreamCard b { font-size: 10px; }
+.remoteStreamCard small { margin-top: 2px; color: #a48e9d; font-size: 8px; }
+.remoteStreamCard button {
+  border: 1px solid #7047d5;
+  border-radius: 8px;
+  background: #5431aa;
+  color: white;
+  padding: 7px 11px;
+  font-size: 9px;
+  cursor: pointer;
+}
+.remoteStreamCard.watching button {
+  border-color: #8a3548;
+  background: #572330;
+}
+.liveDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff4964;
+  box-shadow: 0 0 10px #ff4964;
+  animation: streamPulse 1.3s ease-in-out infinite;
+}
+.member b {
+  font-size: 11px;
+}
+.member small {
+  font-size: 9px;
+}
+.node b {
+  font-size: 12px;
+}
+.sourceCard b {
+  font-size: 11px;
+}
+@media (max-width: 820px) {
+  .sourceGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Layout safety: every panel must stay inside the Electron viewport. */
+.shell,
+.content,
+.sidebar,
+.members,
+.chat,
+.messages,
+.voiceStage,
+.peopleGrid,
+.personCard,
+.remoteStreamCard,
+.remoteStreamCard > div,
+.settingsBody,
+.settingsBody > main,
+.sourceGrid,
+.sourceCard,
+.composer {
+  min-width: 0;
+}
+.content {
+  overflow: hidden;
+}
+.content > header .title,
+.content > header .title > div {
+  min-width: 0;
+}
+.content > header .title b,
+.content > header .title small,
+.serverHead b,
+.profile b,
+.profile small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.voiceStage {
+  flex: 0 1 auto;
+  max-height: min(58vh, 560px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #3b3260 transparent;
+}
+.peopleGrid {
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+}
+.personCard {
+  height: auto;
+  min-height: 158px;
+  padding: 13px 8px;
+}
+.personCard .avatar.large {
+  width: 62px;
+  height: 62px;
+  flex: 0 0 62px;
+}
+.voiceStatus {
+  max-width: 100%;
+}
+.voiceStatus small {
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.remoteStreamCard {
+  flex-wrap: wrap;
+}
+.remoteStreamCard > div,
+.remoteStreamCard p {
+  flex: 1;
+  min-width: 140px;
+}
+.remoteStreamCard p b,
+.remoteStreamCard p small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.remoteStreamCard button {
+  max-width: 100%;
+  white-space: normal;
+}
+.media video {
+  max-width: 100%;
+}
+.composer input {
+  min-width: 40px;
+}
+.toast {
+  left: 22px;
+  right: 22px;
+  width: fit-content;
+  max-width: calc(100vw - 44px);
+  margin-left: auto;
+  overflow-wrap: anywhere;
+}
+.settingsModal,
+.sharePicker {
+  max-width: 100%;
+  max-height: 100%;
+}
+.settingsBody > main,
+.sourceGrid {
+  overscroll-behavior: contain;
+}
+.settingField > span,
+.settingToggle > span,
+.micTest > div {
+  min-width: 0;
+}
+.settingField select {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 1120px) {
+  .shell,
+  .shell.withoutMembers {
+    grid-template-columns: 64px 220px minmax(0, 1fr);
+  }
+  .members {
+    display: none;
+  }
+  .voiceStage {
+    margin-inline: 10px;
+  }
+}
+
+@media (max-height: 760px) {
+  .modalBackdrop {
+    padding: 10px;
+  }
+  .settingsModal {
+    height: calc(100vh - 20px);
+  }
+  .settingsModal > header {
+    padding: 12px 16px;
+  }
+  .settingsModal > footer {
+    padding: 9px 12px;
+  }
+  .settingsBody > main {
+    padding: 16px 20px;
+  }
+  .voiceStage {
+    max-height: 54vh;
+    margin-top: 9px;
+  }
+  .personCard {
+    min-height: 142px;
+  }
+  .personCard .avatar.large {
+    width: 54px;
+    height: 54px;
+    flex-basis: 54px;
+  }
+}
+
+@media (max-width: 760px) {
+  .shell,
+  .shell.withoutMembers {
+    grid-template-columns: 58px minmax(0, 1fr);
+  }
+  .sidebar {
+    display: none;
+  }
+  .content > header {
+    padding-inline: 12px;
+  }
+  .headerBtns {
+    flex: 0 0 auto;
+  }
+  .voiceStage {
+    margin-inline: 7px;
+  }
+  .settingsBody {
+    display: flex;
+    flex-direction: column;
+  }
+  .settingsBody > nav {
+    flex: 0 0 auto;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 8px;
+    border-right: 0;
+    border-bottom: 1px solid #242c40;
+  }
+  .settingsBody > nav button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .settingsBody > main {
+    padding: 15px;
+  }
+  .settingField {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+  .micTest {
+    grid-template-columns: 1fr;
+  }
+  .settingsModal > footer {
+    flex-wrap: wrap;
+  }
+  .settingsModal > footer span {
+    display: none;
+  }
+  .settingsModal > footer button {
+    flex: 1 1 auto;
+  }
+  .sourceGrid {
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    padding: 12px;
+  }
+}

@@ -1,1 +1,1 @@
-{"name":"@voiceforge/desktop","version":"0.3.0","private":true,"main":"main.cjs","scripts":{"start":"electron ."}}
+{"name":"@voiceforge/desktop","version":"1.0.0","private":true,"main":"main.cjs","scripts":{"start":"electron ."}}

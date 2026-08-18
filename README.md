@@ -37,7 +37,7 @@ npm install
 npm run build:windows
 ```
 
-Результат: `VoiceForge-Setup-0.3.0.exe`.
+Результат: `VoiceForge-Setup-1.0.0.exe`.
 
 ## Linux
 
