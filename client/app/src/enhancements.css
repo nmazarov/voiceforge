@@ -2485,6 +2485,10 @@ body { font-size: 14px; }
 .discordCreateChanModalBox {
   max-width: 460px;
   width: 90vw;
+  background: #131724;
+  border: 1px solid #28324a;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
 }
 .discordModalSectionLabel {
   font-size: 11px;

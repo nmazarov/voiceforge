@@ -2330,17 +2330,17 @@ function App() {
           onClick={() => setCreateChannelOpen(false)}
         >
           <div
-            className="discordVolumeModalBox discordCreateChanModalBox"
+            className="discordVolumeModalContent discordCreateChanModalBox"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="discordVolumeModalHeader">
+            <div className="discordVolumeModalHead">
               <div>
-                <h3>{en ? "Create Channel" : "Создать канал"}</h3>
-                <small>
+                <span className="volumeModalName">{en ? "Create Channel" : "Создать канал"}</span>
+                <span className="volumeModalSub">
                   {createChannelType === "text"
                     ? (en ? "in Text Channels" : "в категории Текстовые каналы")
                     : (en ? "in Voice Channels" : "в категории Голосовые каналы")}
-                </small>
+                </span>
               </div>
               <button
                 className="volumeModalCloseBtn"
