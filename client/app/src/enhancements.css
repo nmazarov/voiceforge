@@ -2095,3 +2095,228 @@ body { font-size: 14px; }
   background: #f43f5e;
   box-shadow: 0 0 6px rgba(244, 63, 94, 0.6);
 }
+
+
+/* ==========================================================================
+   Task 1: Individual User Volume (0-200%) Controls
+   ========================================================================== */
+
+/* Mini volume button in sidebar user row */
+.sidebarUserVolumeBtn {
+  margin-left: 2px;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: #7b88a2;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  opacity: 0.7;
+  transition: opacity 0.15s, background 0.12s, color 0.12s;
+}
+.discordChannelUserRow:hover .sidebarUserVolumeBtn {
+  opacity: 1;
+}
+.sidebarUserVolumeBtn:hover {
+  background: #252d40;
+  color: #fff;
+}
+.sidebarUserVolumeBtn.custom {
+  opacity: 1;
+  color: #8b5cf6;
+}
+.sidebarVolTag {
+  font-size: 9px;
+  font-weight: 700;
+  background: #272145;
+  color: #c4b5fd;
+  border-radius: 4px;
+  padding: 1px 3px;
+}
+
+/* Members list item clickable */
+.member.clickable {
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.member.clickable:hover {
+  background: #181d2a;
+}
+.memberVolTag {
+  color: #8b5cf6;
+  font-weight: 700;
+}
+
+/* Modal Overlay & Popover */
+.discordVolumeModalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  animation: fadeInModal 0.15s ease-out;
+}
+@keyframes fadeInModal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.discordVolumeModalContent {
+  width: 90%;
+  max-width: 380px;
+  background: #131724;
+  border: 1px solid #28324a;
+  border-radius: 16px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
+  overflow: hidden;
+  animation: scaleInModal 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes scaleInModal {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.discordVolumeModalHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid #1f273a;
+  background: #10141f;
+}
+.volumeUserHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.volumeModalName {
+  display: block;
+  font-size: 15px;
+  color: #fff;
+  font-weight: 700;
+}
+.volumeModalSub {
+  display: block;
+  font-size: 11px;
+  color: #828ea8;
+}
+.volumeModalCloseBtn {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #7b88a2;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  transition: background 0.12s, color 0.12s;
+}
+.volumeModalCloseBtn:hover {
+  background: #22293b;
+  color: #fff;
+}
+
+.discordVolumeModalBody {
+  padding: 18px;
+}
+.volumeSliderHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.volumeLabel {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: #8d98af;
+}
+.volumeValueBadge {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #1e2538;
+  color: #d1d5db;
+}
+.volumeValueBadge.boosted {
+  background: rgba(139, 92, 246, 0.25);
+  color: #c4b5fd;
+  border: 1px solid #7c3aed;
+}
+.volumeValueBadge.muted {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border: 1px solid #ef4444;
+}
+
+/* Range Slider */
+.discordVolumeRangeSlider {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: #252e44;
+  outline: none;
+  -webkit-appearance: none;
+  margin: 12px 0 6px;
+  cursor: pointer;
+}
+.discordVolumeRangeSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #8b5cf6;
+  border: 3px solid #131724;
+  box-shadow: 0 0 8px rgba(139, 92, 246, 0.8);
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.discordVolumeRangeSlider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.volumeSliderTicks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #6b778f;
+  margin-top: 4px;
+}
+
+/* Quick Actions */
+.volumeQuickActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-top: 18px;
+}
+.volumeQuickBtn {
+  padding: 9px 8px;
+  border: 1px solid #28324a;
+  border-radius: 9px;
+  background: #181e2e;
+  color: #bac4da;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s;
+  text-align: center;
+}
+.volumeQuickBtn:hover {
+  background: #222b40;
+  color: #fff;
+  border-color: #3b4868;
+}
+.volumeQuickBtn.active {
+  background: #3a1c22;
+  border-color: #ef4444;
+  color: #ff6b7b;
+}

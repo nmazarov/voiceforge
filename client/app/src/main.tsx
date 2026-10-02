@@ -398,7 +398,15 @@ function App() {
     [searchQuery, setSearchQuery] = useState(""),
     [moreOpen, setMoreOpen] = useState(false),
     [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({}),
-    [ping, setPing] = useState<number | null>(null);
+    [ping, setPing] = useState<number | null>(null),
+    [userVolumes, setUserVolumes] = useState<Record<string, number>>(() => {
+      try {
+        return JSON.parse(localStorage.getItem("vf_user_volumes") || "{}");
+      } catch {
+        return {};
+      }
+    }),
+    [volumeMenuUser, setVolumeMenuUser] = useState<string | null>(null);
   const en = settings.language === "en";
   const mediaRef = useRef<HTMLDivElement>(null),
     deafenedRef = useRef(false),
@@ -408,7 +416,8 @@ function App() {
     usernameRef = useRef<string>(username),
     noiseGateRef = useRef<{ stop: () => void } | null>(null),
     fileInputRef = useRef<HTMLInputElement>(null),
-    wsRef = useRef<WebSocket | null>(null);
+    wsRef = useRef<WebSocket | null>(null),
+    remoteGainsRef = useRef<Record<string, GainNode>>({});
   const headers = {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
@@ -920,9 +929,12 @@ function App() {
           }
           const element = track.attach();
           if (track.kind === Track.Kind.Audio) {
+            const pName = participant.name || participant.identity;
             element.dataset.voiceforgeAudio = "true";
+            element.dataset.participant = pName;
             element.muted = deafenedRef.current;
-            element.volume = settings.outputVolume / 100;
+            const userVol = (userVolumes[pName] ?? 100) / 100;
+            element.volume = Math.max(0, Math.min(1, (settings.outputVolume / 100) * userVol));
             document.body.appendChild(element);
           } else mediaRef.current?.appendChild(element);
           refresh();
@@ -1199,13 +1211,33 @@ function App() {
     setToken("");
     setUsername("");
   }
+  function setUserVolume(targetUser: string, vol: number) {
+    const clamped = Math.max(0, Math.min(200, vol));
+    const updated = { ...userVolumes, [targetUser]: clamped };
+    setUserVolumes(updated);
+    try {
+      localStorage.setItem("vf_user_volumes", JSON.stringify(updated));
+    } catch {}
+
+    document
+      .querySelectorAll<HTMLMediaElement>('[data-voiceforge-audio="true"]')
+      .forEach((el) => {
+        if (el.dataset.participant === targetUser) {
+          const base = settings.outputVolume / 100;
+          const mult = clamped / 100;
+          el.volume = Math.max(0, Math.min(1, base * mult));
+        }
+      });
+  }
   async function applySettings(next: ClientSettings) {
     setSettings(next);
     currentSoundSettings = next;
     document
       .querySelectorAll<HTMLMediaElement>('[data-voiceforge-audio="true"]')
       .forEach((element) => {
-        element.volume = next.outputVolume / 100;
+        const pName = element.dataset.participant;
+        const userVol = pName ? ((userVolumes[pName] ?? 100) / 100) : 1;
+        element.volume = Math.max(0, Math.min(1, (next.outputVolume / 100) * userVol));
       });
     if (room) {
       try {
@@ -1385,6 +1417,22 @@ function App() {
                         >
                           {participantStates[participant]?.mic ? "🎙" : "🔇"}
                         </span>
+                        {participant !== username && (
+                          <button
+                            type="button"
+                            className={`sidebarUserVolumeBtn ${(userVolumes[participant] ?? 100) !== 100 ? "custom" : ""}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setVolumeMenuUser(volumeMenuUser === participant ? null : participant);
+                            }}
+                            title={en ? `Volume: ${userVolumes[participant] ?? 100}%` : `Громкость: ${userVolumes[participant] ?? 100}%`}
+                          >
+                            {(userVolumes[participant] ?? 100) === 0 ? "🔇" : "🔊"}
+                            {(userVolumes[participant] ?? 100) !== 100 && (
+                              <span className="sidebarVolTag">{userVolumes[participant]}%</span>
+                            )}
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1868,11 +1916,21 @@ function App() {
         <Section title={`${en ? "ONLINE" : "В СЕТИ"} — ${participants.length || 1}`} />
         {(participants.length ? participants : [username]).map(
           (participant) => (
-            <div className="member" key={participant}>
+            <div
+              className={`member ${participant !== username ? "clickable" : ""}`}
+              key={participant}
+              onClick={() => participant !== username && setVolumeMenuUser(participant)}
+              title={participant !== username ? (en ? `Volume: ${userVolumes[participant] ?? 100}% (click to adjust)` : `Громкость: ${userVolumes[participant] ?? 100}% (нажмите для настройки)`) : undefined}
+            >
               <Avatar name={participant} />
               <div>
                 <b>{participant}</b>
-                <small>{voice ? (en ? "In voice channel" : "В голосовом канале") : "Online"}</small>
+                <small>
+                  {voice ? (en ? "In voice channel" : "В голосовом канале") : "Online"}
+                  {participant !== username && (userVolumes[participant] ?? 100) !== 100 && (
+                    <span className="memberVolTag"> • {userVolumes[participant]}%</span>
+                  )}
+                </small>
               </div>
               <em />
             </div>
@@ -1886,6 +1944,63 @@ function App() {
           </span>
         </div>
       </aside>
+      {volumeMenuUser && (
+        <div className="discordVolumeModalOverlay" onClick={() => setVolumeMenuUser(null)}>
+          <div className="discordVolumeModalContent" onClick={(e) => e.stopPropagation()}>
+            <div className="discordVolumeModalHead">
+              <div className="volumeUserHeader">
+                <Avatar name={volumeMenuUser} />
+                <div>
+                  <b className="volumeModalName">{volumeMenuUser}</b>
+                  <span className="volumeModalSub">{en ? "User Volume Settings" : "Настройки громкости пользователя"}</span>
+                </div>
+              </div>
+              <button className="volumeModalCloseBtn" onClick={() => setVolumeMenuUser(null)}>✕</button>
+            </div>
+            <div className="discordVolumeModalBody">
+              <div className="volumeSliderHeader">
+                <span className="volumeLabel">{en ? "USER VOLUME" : "ГРОМКОСТЬ ПОЛЬЗОВАТЕЛЯ"}</span>
+                <span className={`volumeValueBadge ${(userVolumes[volumeMenuUser] ?? 100) > 100 ? "boosted" : (userVolumes[volumeMenuUser] ?? 100) === 0 ? "muted" : ""}`}>
+                  {userVolumes[volumeMenuUser] ?? 100}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="200"
+                value={userVolumes[volumeMenuUser] ?? 100}
+                onChange={(e) => setUserVolume(volumeMenuUser, Number(e.target.value))}
+                className="discordVolumeRangeSlider"
+              />
+              <div className="volumeSliderTicks">
+                <span>0% ({en ? "Mute" : "Без звука"})</span>
+                <span>100% ({en ? "Normal" : "Стандарт"})</span>
+                <span>200% ({en ? "Boost" : "Усиление"})</span>
+              </div>
+              <div className="volumeQuickActions">
+                <button
+                  className={`volumeQuickBtn ${(userVolumes[volumeMenuUser] ?? 100) === 0 ? "active" : ""}`}
+                  onClick={() => setUserVolume(volumeMenuUser, (userVolumes[volumeMenuUser] ?? 100) === 0 ? 100 : 0)}
+                >
+                  {(userVolumes[volumeMenuUser] ?? 100) === 0 ? (en ? "🔊 Unmute" : "🔊 Включить звук") : (en ? "🔇 Заглушить" : "🔇 Заглушить")}
+                </button>
+                <button
+                  className="volumeQuickBtn"
+                  onClick={() => setUserVolume(volumeMenuUser, 100)}
+                >
+                  100% ({en ? "Reset" : "Сброс"})
+                </button>
+                <button
+                  className="volumeQuickBtn"
+                  onClick={() => setUserVolume(volumeMenuUser, 150)}
+                >
+                  150% ({en ? "Boost" : "Усиление"})
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {sources.length > 0 && (
         <SharePicker
           sources={sources}
