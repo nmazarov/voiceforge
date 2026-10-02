@@ -3355,3 +3355,235 @@ body { font-size: 14px; }
 }
 
 .discordUserPanelRoleIcon { font-size: 12px; line-height: 1; vertical-align: middle; flex-shrink: 0; margin-left: 2px; }
+
+
+/* ==========================================================================
+   Discord Channel Search with Highlighting & Jump Navigation (Item 6)
+   ========================================================================== */
+.discordSearchBarRow {
+  height: 48px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  background: #111420;
+  border-bottom: 1px solid #1a2030;
+  z-index: 15;
+  animation: searchBarSlide 0.15s ease-out;
+}
+
+.searchBarLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  max-width: 480px;
+  background: #090c14;
+  border: 1px solid #242b3f;
+  border-radius: 8px;
+  padding: 0 12px;
+  height: 34px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.searchBarLeft:focus-within {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.25);
+}
+
+.searchBarLeft .searchIcon {
+  font-size: 15px;
+  color: #727d96;
+}
+
+.searchBarLeft input {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: #f2f3f5;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.searchBarLeft input::placeholder {
+  color: #636d85;
+}
+
+.searchClearBtn {
+  background: transparent;
+  border: 0;
+  color: #727d96;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+}
+
+.searchClearBtn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.searchBarRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.searchMatchesInfo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #090c14;
+  border: 1px solid #242b3f;
+  border-radius: 8px;
+  padding: 2px 6px;
+  height: 34px;
+}
+
+.searchCountText {
+  font-size: 11px;
+  font-weight: 700;
+  color: #949ba4;
+  padding: 0 4px;
+}
+
+.searchNavBtn {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #8e97ac;
+  font-size: 10px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.searchNavBtn:hover:not(:disabled) {
+  background: #1c2234;
+  color: #fff;
+}
+
+.searchNavBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.searchNoMatches {
+  font-size: 11px;
+  color: #f87171;
+  font-weight: 600;
+  padding: 0 6px;
+}
+
+.searchCloseBtn {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #242b3f;
+  background: #141824;
+  color: #8e97ac;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.searchCloseBtn:hover {
+  background: #1e2436;
+  border-color: #3b4664;
+  color: #fff;
+}
+
+/* Match Highlighting & Jump Target */
+.discordSearchHighlight {
+  background: rgba(245, 158, 11, 0.35);
+  color: #fff;
+  border-radius: 3px;
+  padding: 0 3px;
+  font-weight: 700;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+}
+
+.searchActiveTarget {
+  background: rgba(124, 58, 237, 0.14) !important;
+  border-left: 3px solid #7c3aed !important;
+  box-shadow: inset 0 0 20px rgba(124, 58, 237, 0.12) !important;
+  border-radius: 0 8px 8px 0;
+  transition: background 0.25s ease, border-color 0.25s ease;
+}
+
+.searchActiveTarget .discordSearchHighlight {
+  background: #f59e0b;
+  color: #000;
+  border-color: #d97706;
+}
+
+/* Search Empty State */
+.discordSearchEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.emptySearchIcon {
+  font-size: 42px;
+  color: #4b5563;
+  margin-bottom: 12px;
+}
+
+.discordSearchEmpty h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #f2f3f5;
+  margin: 0 0 8px;
+}
+
+.discordSearchEmpty p {
+  font-size: 13px;
+  color: #828ea8;
+  max-width: 380px;
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+.discordSearchResetBtn {
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: 1px solid #28324a;
+  background: #171d2b;
+  color: #c4b5fd;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.discordSearchResetBtn:hover {
+  background: #232c40;
+  color: #fff;
+  border-color: #7c3aed;
+}
+
+@keyframes searchBarSlide {
+  from {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

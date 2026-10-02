@@ -339,7 +339,24 @@ function SpoilerSpan({ text }: { text: string }) {
   );
 }
 
-function parseInlineTokens(text: string): React.ReactNode[] {
+function highlightMatch(text: string, query?: string): React.ReactNode {
+  if (!query || !query.trim()) return text;
+  const escaped = query.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`(${escaped})`, "gi");
+  const parts = text.split(regex);
+  if (parts.length === 1) return text;
+  return parts.map((part, i) =>
+    regex.test(part) ? (
+      <mark key={i} className="discordSearchHighlight">
+        {part}
+      </mark>
+    ) : (
+      part
+    )
+  );
+}
+
+function parseInlineTokens(text: string, searchQuery?: string): React.ReactNode[] {
   const regex = /(\|\|.+?\|\||\*\*.+?\*\*|~~.+?~~|`[^`]+`|\*[^*]+\*|https?:\/\/[^\s]+)/g;
   const parts = text.split(regex);
   return parts.map((part, i) => {
@@ -348,16 +365,16 @@ function parseInlineTokens(text: string): React.ReactNode[] {
       return <SpoilerSpan key={i} text={part.slice(2, -2)} />;
     }
     if (part.startsWith("**") && part.endsWith("**") && part.length >= 4) {
-      return <strong key={i}>{part.slice(2, -2)}</strong>;
+      return <strong key={i}>{highlightMatch(part.slice(2, -2), searchQuery)}</strong>;
     }
     if (part.startsWith("~~") && part.endsWith("~~") && part.length >= 4) {
-      return <del key={i}>{part.slice(2, -2)}</del>;
+      return <del key={i}>{highlightMatch(part.slice(2, -2), searchQuery)}</del>;
     }
     if (part.startsWith("`") && part.endsWith("`") && part.length >= 2) {
-      return <code key={i} className="discordInlineCode">{part.slice(1, -1)}</code>;
+      return <code key={i} className="discordInlineCode">{highlightMatch(part.slice(1, -1), searchQuery)}</code>;
     }
     if (part.startsWith("*") && part.endsWith("*") && part.length >= 2) {
-      return <em key={i}>{part.slice(1, -1)}</em>;
+      return <em key={i}>{highlightMatch(part.slice(1, -1), searchQuery)}</em>;
     }
     if (part.startsWith("http://") || part.startsWith("https://")) {
       return (
@@ -366,11 +383,11 @@ function parseInlineTokens(text: string): React.ReactNode[] {
         </a>
       );
     }
-    return part;
+    return highlightMatch(part, searchQuery);
   });
 }
 
-function MarkdownMessage({ content }: { content: string }) {
+function MarkdownMessage({ content, searchQuery }: { content: string; searchQuery?: string }) {
   if (content.includes("```")) {
     const segments = content.split(/(```[\s\S]*?```)/g);
     return (
@@ -386,7 +403,7 @@ function MarkdownMessage({ content }: { content: string }) {
           }
           return (
             <p key={idx} className="messageParagraph">
-              {parseInlineTokens(seg)}
+              {parseInlineTokens(seg, searchQuery)}
             </p>
           );
         })}
@@ -403,7 +420,7 @@ function MarkdownMessage({ content }: { content: string }) {
       renderedLines.push(
         <blockquote key={`q-${key}`} className="discordQuote">
           {quoteBuffer.map((line, qIdx) => (
-            <div key={qIdx}>{parseInlineTokens(line)}</div>
+            <div key={qIdx}>{parseInlineTokens(line, searchQuery)}</div>
           ))}
         </blockquote>
       );
@@ -418,7 +435,7 @@ function MarkdownMessage({ content }: { content: string }) {
       flushQuote(index);
       renderedLines.push(
         <span key={`l-${index}`} className="messageLine">
-          {parseInlineTokens(line)}
+          {parseInlineTokens(line, searchQuery)}
           {index < lines.length - 1 && <br />}
         </span>
       );
@@ -490,7 +507,8 @@ function App() {
     [myRole, setMyRole] = useState<Role>("user"),
     [isAtBottom, setIsAtBottom] = useState(true),
     [unreadBelowCount, setUnreadBelowCount] = useState(0),
-    [isDraggingFile, setIsDraggingFile] = useState(false);
+    [isDraggingFile, setIsDraggingFile] = useState(false),
+    [searchMatchIndex, setSearchMatchIndex] = useState(0);
   const en = settings.language === "en";
   const mediaRef = useRef<HTMLDivElement>(null),
     deafenedRef = useRef(false),
@@ -510,6 +528,22 @@ function App() {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
   };
+  const filteredMessages = messages.filter(
+    (message) =>
+      !searchQuery.trim() ||
+      message.body.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      message.username.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  useEffect(() => {
+    if (!searchOpen || !searchQuery.trim() || filteredMessages.length === 0) return;
+    const activeMsg = filteredMessages[searchMatchIndex];
+    if (activeMsg) {
+      const el = document.getElementById(`msg-${activeMsg.id}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }, [searchMatchIndex, searchOpen, searchQuery]);
   useEffect(() => {
     activeTextRef.current = activeText;
   }, [activeText]);
@@ -2156,22 +2190,110 @@ function App() {
           </div>
         </header>
         {searchOpen && (
-          <div className="searchBar">
-            <span>⌕</span>
-            <input
-              autoFocus
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Поиск в текущем канале…"
-            />
-            <button
-              onClick={() => {
-                setSearchQuery("");
-                setSearchOpen(false);
-              }}
-            >
-              ×
-            </button>
+          <div className="discordSearchBarRow">
+            <div className="searchBarLeft">
+              <span className="searchIcon">⌕</span>
+              <input
+                autoFocus
+                value={searchQuery}
+                onChange={(event) => {
+                  setSearchQuery(event.target.value);
+                  setSearchMatchIndex(0);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setSearchOpen(false);
+                    setSearchQuery("");
+                  } else if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (filteredMessages.length > 0) {
+                      if (e.shiftKey) {
+                        setSearchMatchIndex((prev) =>
+                          prev > 0 ? prev - 1 : filteredMessages.length - 1
+                        );
+                      } else {
+                        setSearchMatchIndex((prev) =>
+                          prev < filteredMessages.length - 1 ? prev + 1 : 0
+                        );
+                      }
+                    }
+                  }
+                }}
+                placeholder={
+                  en
+                    ? `Search in #${activeText?.name || "chat"}…`
+                    : `Поиск в #${activeText?.name || "чате"}…`
+                }
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  className="searchClearBtn"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setSearchMatchIndex(0);
+                  }}
+                  title={en ? "Clear input" : "Очистить"}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            <div className="searchBarRight">
+              {searchQuery.trim() && (
+                <div className="searchMatchesInfo">
+                  {filteredMessages.length > 0 ? (
+                    <>
+                      <span className="searchCountText">
+                        {searchMatchIndex + 1} {en ? "of" : "из"} {filteredMessages.length}
+                      </span>
+                      <button
+                        type="button"
+                        className="searchNavBtn"
+                        disabled={filteredMessages.length <= 1}
+                        onClick={() =>
+                          setSearchMatchIndex((prev) =>
+                            prev > 0 ? prev - 1 : filteredMessages.length - 1
+                          )
+                        }
+                        title={en ? "Previous match (Shift+Enter)" : "Предыдущее (Shift+Enter)"}
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        className="searchNavBtn"
+                        disabled={filteredMessages.length <= 1}
+                        onClick={() =>
+                          setSearchMatchIndex((prev) =>
+                            prev < filteredMessages.length - 1 ? prev + 1 : 0
+                          )
+                        }
+                        title={en ? "Next match (Enter)" : "Следующее (Enter)"}
+                      >
+                        ▼
+                      </button>
+                    </>
+                  ) : (
+                    <span className="searchNoMatches">
+                      {en ? "No matches" : "Нет совпадений"}
+                    </span>
+                  )}
+                </div>
+              )}
+              <button
+                type="button"
+                className="searchCloseBtn"
+                onClick={() => {
+                  setSearchQuery("");
+                  setSearchOpen(false);
+                }}
+                title={en ? "Close search (Esc)" : "Закрыть поиск (Esc)"}
+              >
+                ✕
+              </button>
+            </div>
           </div>
         )}
         {voice && (
@@ -2367,19 +2489,33 @@ function App() {
                 <p>{en ? "This is the beginning of this channel." : "Это начало истории этого канала."}</p>
               </div>
             )}
-            {messages
-              .filter(
-                (message) =>
-                  !searchQuery ||
-                  message.body
-                    .toLowerCase()
-                    .includes(searchQuery.toLowerCase()) ||
-                  message.username
-                    .toLowerCase()
-                    .includes(searchQuery.toLowerCase()),
-              )
-              .map((message) => (
-                <div className="message discordMessageRow" key={message.id}>
+            {searchOpen && searchQuery.trim() && filteredMessages.length === 0 && (
+              <div className="discordSearchEmpty">
+                <span className="emptySearchIcon">⌕</span>
+                <h3>{en ? "No matches found" : "Ничего не найдено"}</h3>
+                <p>
+                  {en
+                    ? `No messages matched "${searchQuery}" in #${activeText?.name || "chat"}`
+                    : `По запросу «${searchQuery}» ничего не найдено в #${activeText?.name || "чате"}`}
+                </p>
+                <button
+                  type="button"
+                  className="discordSearchResetBtn"
+                  onClick={() => setSearchQuery("")}
+                >
+                  {en ? "Clear Search" : "Очистить поиск"}
+                </button>
+              </div>
+            )}
+            {filteredMessages.map((message, mIdx) => {
+              const isActiveMatch =
+                searchOpen && Boolean(searchQuery.trim()) && mIdx === searchMatchIndex;
+              return (
+                <div
+                  id={`msg-${message.id}`}
+                  className={`message discordMessageRow ${isActiveMatch ? "searchActiveTarget" : ""}`}
+                  key={message.id}
+                >
                   {message.reply_to && (
                     <div className="discordReplyContext">
                       <span className="discordReplySpine" />
@@ -2398,7 +2534,7 @@ function App() {
                                 : "#f2f3f5",
                           }}
                         >
-                          {message.username}
+                          {highlightMatch(message.username, searchOpen ? searchQuery : undefined)}
                         </b>
                         <RoleBadge role={message.role || getUserRole(message.username)} en={en} />
                         <small>
@@ -2436,7 +2572,7 @@ function App() {
                         </div>
                       ) : (
                         <div>
-                          <MarkdownMessage content={message.body} />
+                          <MarkdownMessage content={message.body} searchQuery={searchOpen ? searchQuery : undefined} />
                           {message.is_edited && (
                             <span
                               className="discordEditedBadge"
@@ -2509,7 +2645,8 @@ function App() {
                     </div>
                   </div>
                 </div>
-              ))}
+              );
+            })}
           </div>
           {!isAtBottom && (
             <button
