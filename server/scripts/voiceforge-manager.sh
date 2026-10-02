@@ -52,7 +52,55 @@ rotate_sessions(){ yesno "Сбросить все активные пользо�
 show_status(){ local ip="$(pubip)" tmp="$(mktemp)"; compose ps >"$tmp" 2>&1||true; whiptail --title "$APP • $(status)" --scrolltext --msgbox "Platform: $(arch)\nPublic IP: ${ip:-unknown}\nAdmin: http://${ip:-SERVER_IP}:3001/admin\nAPI: http://${ip:-SERVER_IP}:3001\nLiveKit: ws://${ip:-SERVER_IP}:7880\n\nPorts: TCP 3001,7880,7881 • UDP 50000-50100\n\n$(cat "$tmp")" 28 100; rm -f "$tmp"; }
 logs(){ local t="$(mktemp)"; compose logs --tail=250 --no-color >"$t" 2>&1||true; whiptail --title "$APP logs" --scrolltext --textbox "$t" 28 110; rm -f "$t"; }
 backup(){ mkdir -p "$BACKUPS"; local s="$(date +%Y%m%d-%H%M%S)"; tar -czf "$BACKUPS/config-$s.tar.gz" -C "$ROOT" .env infra/livekit.yaml 2>/dev/null; docker run --rm -v voiceforge-data:/data:ro -v "$BACKUPS:/backup" alpine sh -c "tar -czf /backup/data-$s.tar.gz -C /data ." >/dev/null 2>&1||true; msg "Backup: $BACKUPS"; }
-diagnostics(){ local t="$(mktemp)"; { echo "VoiceForge diagnostics"; date -Is; uname -a; docker --version 2>&1; docker compose version 2>&1; echo; compose config 2>&1; echo; compose ps 2>&1; } >"$t"; whiptail --title "Diagnostics" --scrolltext --textbox "$t" 30 110; rm -f "$t"; }
+if [ $# -gt 0 ]; then
+  case "$1" in
+    start|up) compose up -d; echo "VoiceForge запущен."; exit 0;;
+    stop|down) compose stop; echo "VoiceForge остановлен."; exit 0;;
+    restart) compose restart; echo "VoiceForge перезапущен."; exit 0;;
+    status)
+      ip="$(pubip)"
+      echo "=== VoiceForge Server Status: $(status) ==="
+      echo "Platform:  $(arch)"
+      echo "Public IP: ${ip:-unknown}"
+      echo "API/App:   http://${ip:-SERVER_IP}:3001"
+      echo "Admin UI:  http://${ip:-SERVER_IP}:3001/admin"
+      echo "LiveKit:   ws://${ip:-SERVER_IP}:7880"
+      echo "Ports:     TCP 3001, 7880, 7881 | UDP 50000-50100"
+      echo ""
+      compose ps
+      exit 0;;
+    logs)
+      shift
+      compose logs -f --tail=100 "$@"
+      exit 0;;
+    backup)
+      mkdir -p "$BACKUPS"; local_s="$(date +%Y%m%d-%H%M%S)"
+      tar -czf "$BACKUPS/config-$local_s.tar.gz" -C "$ROOT" .env infra/livekit.yaml 2>/dev/null || true
+      docker run --rm -v voiceforge-data:/data:ro -v "$BACKUPS:/backup" alpine sh -c "tar -czf /backup/data-$local_s.tar.gz -C /data ." >/dev/null 2>&1 || true
+      echo "Резервная копия создана в: $BACKUPS"
+      exit 0;;
+    *)
+      echo "Использование: voiceforge [start|stop|restart|status|logs|backup]"
+      echo "Или запустите 'voiceforge' без параметров для интерактивного меню."
+      exit 1;;
+  esac
+fi
+
+if ! command -v whiptail >/dev/null 2>&1; then
+  ip="$(pubip)"
+  echo "=== VoiceForge Server Status: $(status) ==="
+  echo "Public IP: ${ip:-unknown}"
+  echo "API/App:   http://${ip:-SERVER_IP}:3001"
+  echo "Admin UI:  http://${ip:-SERVER_IP}:3001/admin"
+  echo ""
+  echo "Команды управления:"
+  echo "  voiceforge status   - статус контейнеров"
+  echo "  voiceforge restart  - перезапустить"
+  echo "  voiceforge logs     - логи"
+  echo "  voiceforge stop     - остановить"
+  exit 0
+fi
+
 while true; do c=$(whiptail --title "VoiceForge Server Manager • $(status) • $(arch)" --menu "Управление сервером:" 30 90 16 \
 "1" "🚀 Установить / первичная настройка" "2" "⬆ Обновить контейнеры" "3" "▶ Запустить" "4" "■ Остановить" "5" "↻ Перезапустить" "6" "● Статус" "7" "≡ Логи" \
 "8" "🔑 Сгенерировать новый Admin Key" "9" "🛡 Сбросить активные сессии" "10" "▣ Backup" "11" "🩺 Диагностика" "12" "🌐 Сеть / порты" "0" "Выход" 3>&1 1>&2 2>&3) || break
