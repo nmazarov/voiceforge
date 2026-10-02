@@ -75,6 +75,7 @@ app.get('/api/admin/users',async(req,reply)=>{const u=requireRole(req,reply,['ad
 app.patch('/api/admin/users/:id',async(req:any,reply)=>{const actor=requireRole(req,reply,['admin','owner']);if(!actor)return;const id=Number(req.params.id);const body=z.object({role:z.enum(['user','admin']).optional(),disabled:z.boolean().optional()}).parse(req.body);const target=db.prepare('SELECT role FROM users WHERE id=?').get(id) as any;if(!target)return reply.code(404).send({error:'User not found'});if(target.role==='owner')return reply.code(403).send({error:'Owner cannot be modified'});if(body.role!==undefined&&actor.role!=='owner')return reply.code(403).send({error:'Only owner can change roles'});if(body.role!==undefined)db.prepare('UPDATE users SET role=? WHERE id=?').run(body.role,id);if(body.disabled!==undefined)db.prepare('UPDATE users SET disabled=? WHERE id=?').run(body.disabled?1:0,id);audit(actor.id,'update_user','user',String(id),body);const updated=db.prepare('SELECT id,username,role,disabled FROM users WHERE id=?').get(id) as any;broadcast('user:updated',updated);return{ok:true,user:updated}});
 app.post('/api/admin/channels',async(req,reply)=>{const actor=requireRole(req,reply,['admin','owner']);if(!actor)return;const b=z.object({name:z.string().min(1).max(64),type:z.enum(['text','voice'])}).parse(req.body);const cleanName=b.type==='text'?b.name.toLowerCase().trim().replace(/[\s_]+/g,'-'):b.name.trim();const info=db.prepare('INSERT INTO channels(name,type) VALUES (?,?)').run(cleanName,b.type);const ch={id:Number(info.lastInsertRowid),name:cleanName,type:b.type};audit(actor.id,'create_channel','channel',String(info.lastInsertRowid),b);broadcast('channel:created',ch);return ch;});
 app.delete('/api/admin/channels/:id',async(req:any,reply)=>{const actor=requireRole(req,reply,['admin','owner']);if(!actor)return;const id=Number(req.params.id);db.prepare('DELETE FROM channels WHERE id=?').run(id);try{db.prepare('DELETE FROM messages WHERE channel_id=?').run(id);}catch{}audit(actor.id,'delete_channel','channel',String(id));broadcast('channel:deleted',{id});return{ok:true}});
+app.patch('/api/admin/channels/:id',async(req:any,reply)=>{const actor=requireRole(req,reply,['admin','owner']);if(!actor)return;const id=Number(req.params.id);const chan=db.prepare('SELECT * FROM channels WHERE id=?').get(id) as any;if(!chan)return reply.code(404).send({error:'Channel not found'});const b=z.object({name:z.string().min(1).max(64)}).parse(req.body);const cleanName=chan.type==='text'?b.name.toLowerCase().trim().replace(/[\s_]+/g,'-'):b.name.trim();db.prepare('UPDATE channels SET name=? WHERE id=?').run(cleanName,id);audit(actor.id,'update_channel','channel',String(id),{oldName:chan.name,newName:cleanName});const updated={id,name:cleanName,type:chan.type};broadcast('channel:updated',updated);return{ok:true,channel:updated}});
 app.get('/api/admin/audit',async(req,reply)=>{const actor=requireRole(req,reply,['owner']);if(!actor)return;return db.prepare(`SELECT a.*,u.username actor_username FROM audit_log a LEFT JOIN users u ON u.id=a.actor_user_id ORDER BY a.id DESC LIMIT 250`).all()});
 const wsClients = new Set<any>();
 function broadcast(event: string, payload: any) {
@@ -145,6 +146,20 @@ app.delete('/api/channels/:id',async(req:any,reply)=>{
   audit(u.id,'delete_channel','channel',String(id));
   broadcast('channel:deleted',{id,name:chan.name,type:chan.type});
   return{ok:true,id};
+});
+app.patch('/api/channels/:id',async(req:any,reply)=>{
+  const u=auth(req);
+  if(!u)return reply.code(401).send({error:'Unauthorized'});
+  const id=Number(req.params.id);
+  const chan=db.prepare('SELECT * FROM channels WHERE id=?').get(id) as any;
+  if(!chan)return reply.code(404).send({error:'Channel not found'});
+  const b=z.object({name:z.string().min(1).max(64)}).parse(req.body);
+  const cleanName=chan.type==='text'?b.name.toLowerCase().trim().replace(/[\s_]+/g,'-'):b.name.trim();
+  db.prepare('UPDATE channels SET name=? WHERE id=?').run(cleanName,id);
+  audit(u.id,'update_channel','channel',String(id),{oldName:chan.name,newName:cleanName});
+  const updated={id,name:cleanName,type:chan.type};
+  broadcast('channel:updated',updated);
+  return{ok:true,channel:updated};
 });
 app.get('/api/users',async(req:any,reply)=>{
   const u=auth(req);

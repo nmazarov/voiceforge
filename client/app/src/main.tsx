@@ -470,6 +470,9 @@ function App() {
     [createChannelType, setCreateChannelType] = useState<"text" | "voice">("text"),
     [newChannelName, setNewChannelName] = useState(""),
     [createChannelLoading, setCreateChannelLoading] = useState(false),
+    [editChannelModal, setEditChannelModal] = useState<Channel | null>(null),
+    [editChannelName, setEditChannelName] = useState(""),
+    [editChannelLoading, setEditChannelLoading] = useState(false),
     [serverUsers, setServerUsers] = useState<ServerUser[]>([]),
     [myRole, setMyRole] = useState<Role>("user");
   const en = settings.language === "en";
@@ -611,6 +614,16 @@ function App() {
                   }
                   return updated;
                 });
+              }
+            } else if (data.event === "channel:updated") {
+              const updatedChan = data.payload as Channel;
+              if (updatedChan) {
+                setChannels((prev) =>
+                  prev.map((c) => (c.id === updatedChan.id ? { ...c, name: updatedChan.name } : c))
+                );
+                if (activeTextRef.current?.id === updatedChan.id) {
+                  setActiveText((current) => (current ? { ...current, name: updatedChan.name } : null));
+                }
               }
             } else if (data.event === "user:updated") {
               const updated = data.payload as ServerUser;
@@ -758,6 +771,41 @@ function App() {
       console.error("Failed to create channel:", err);
     } finally {
       setCreateChannelLoading(false);
+    }
+  }
+
+  async function renameChannel(channelId: number, newName: string) {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    setEditChannelLoading(true);
+    try {
+      const res = await fetch(`${server}/api/channels/${channelId}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ name: trimmed }),
+      });
+      const data = await res.json();
+      if (res.ok && data.channel) {
+        setChannels((prev) =>
+          prev.map((c) => (c.id === channelId ? { ...c, name: data.channel.name } : c))
+        );
+        if (activeText?.id === channelId) {
+          setActiveText((current) => (current ? { ...current, name: data.channel.name } : null));
+        }
+        if (voice === editChannelModal?.name) {
+          setVoice(data.channel.name);
+        }
+        setEditChannelModal(null);
+        setEditChannelName("");
+        playSound("click");
+      } else {
+        alert(data.error || (en ? "Failed to rename channel" : "Не удалось переименовать канал"));
+      }
+    } catch (err) {
+      console.error("Failed to rename channel:", err);
+      alert(en ? "Failed to rename channel" : "Не удалось переименовать канал");
+    } finally {
+      setEditChannelLoading(false);
     }
   }
 
@@ -1712,17 +1760,31 @@ function App() {
                   <i className="chanIcon">#</i>
                   <span className="chanName">{channel.name}</span>
                 </button>
-                <button
-                  type="button"
-                  className="discordChanDeleteBtn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void deleteChannel(channel.id, channel.name);
-                  }}
-                  title={en ? `Delete #${channel.name}` : `Удалить канал #${channel.name}`}
-                >
-                  ×
-                </button>
+                <div className="discordChanActions">
+                  <button
+                    type="button"
+                    className="discordChanSettingsBtn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditChannelModal(channel);
+                      setEditChannelName(channel.name);
+                    }}
+                    title={en ? `Edit #${channel.name}` : `Настроить #${channel.name}`}
+                  >
+                    ⚙️
+                  </button>
+                  <button
+                    type="button"
+                    className="discordChanDeleteBtn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void deleteChannel(channel.id, channel.name);
+                    }}
+                    title={en ? `Delete #${channel.name}` : `Удалить канал #${channel.name}`}
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
             ))}
 
@@ -1768,17 +1830,31 @@ function App() {
                       </span>
                     )}
                   </button>
-                  <button
-                    type="button"
-                    className="discordChanDeleteBtn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void deleteChannel(channel.id, channel.name);
-                    }}
-                    title={en ? `Delete ${channel.name}` : `Удалить канал ${channel.name}`}
-                  >
-                    ×
-                  </button>
+                  <div className="discordChanActions">
+                    <button
+                      type="button"
+                      className="discordChanSettingsBtn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditChannelModal(channel);
+                        setEditChannelName(channel.name);
+                      }}
+                      title={en ? `Edit ${channel.name}` : `Настроить ${channel.name}`}
+                    >
+                      ⚙️
+                    </button>
+                    <button
+                      type="button"
+                      className="discordChanDeleteBtn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void deleteChannel(channel.id, channel.name);
+                      }}
+                      title={en ? `Delete ${channel.name}` : `Удалить канал ${channel.name}`}
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
                 {voice === channel.name && (
                   <div className="discordChannelUsers">
@@ -2731,6 +2807,109 @@ function App() {
                   {createChannelLoading
                     ? (en ? "Creating..." : "Создание...")
                     : (en ? "Create Channel" : "Создать канал")}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {editChannelModal && (
+        <div
+          className="discordVolumeModalOverlay"
+          onClick={() => setEditChannelModal(null)}
+        >
+          <div
+            className="discordVolumeModalContent discordCreateChanModalBox"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="discordVolumeModalHead">
+              <div>
+                <span className="volumeModalName">
+                  {en ? "Channel Settings" : "Настройки канала"}
+                </span>
+                <span className="volumeModalSub">
+                  {editChannelModal.type === "text"
+                    ? `# ${editChannelModal.name}`
+                    : `🔊 ${editChannelModal.name}`}
+                </span>
+              </div>
+              <button
+                className="volumeModalCloseBtn"
+                onClick={() => setEditChannelModal(null)}
+              >
+                ×
+              </button>
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void renameChannel(editChannelModal.id, editChannelName);
+              }}
+              style={{ padding: "0 20px 20px" }}
+            >
+              <div className="discordModalSectionLabel">
+                {en ? "CHANNEL NAME" : "НАЗВАНИЕ КАНАЛА"}
+              </div>
+              <div className="discordChanNameInputWrapper">
+                <span className="chanPrefix">
+                  {editChannelModal.type === "text" ? "#" : "🔊"}
+                </span>
+                <input
+                  type="text"
+                  value={editChannelName}
+                  onChange={(e) => setEditChannelName(e.target.value)}
+                  placeholder={editChannelModal.name}
+                  maxLength={64}
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div className="discordModalFooter" style={{ marginTop: "20px" }}>
+                <button
+                  type="button"
+                  className="discordModalCancelBtn"
+                  onClick={() => setEditChannelModal(null)}
+                >
+                  {en ? "Cancel" : "Отмена"}
+                </button>
+                <button
+                  type="submit"
+                  className="discordModalSubmitBtn"
+                  disabled={
+                    !editChannelName.trim() ||
+                    editChannelName.trim() === editChannelModal.name ||
+                    editChannelLoading
+                  }
+                >
+                  {editChannelLoading
+                    ? en
+                      ? "Saving..."
+                      : "Сохранение..."
+                    : en
+                    ? "Save Changes"
+                    : "Сохранить изменения"}
+                </button>
+              </div>
+
+              <div
+                style={{
+                  marginTop: "20px",
+                  paddingTop: "14px",
+                  borderTop: "1px solid #1f273a",
+                }}
+              >
+                <button
+                  type="button"
+                  className="userBlockActionBtn"
+                  onClick={() => {
+                    const toDelete = editChannelModal;
+                    setEditChannelModal(null);
+                    void deleteChannel(toDelete.id, toDelete.name);
+                  }}
+                  title={en ? "Delete Channel" : "Удалить канал"}
+                >
+                  🗑️ {en ? "Delete Channel" : "Удалить этот канал"}
                 </button>
               </div>
             </form>
