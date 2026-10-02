@@ -474,7 +474,9 @@ function App() {
     [editChannelName, setEditChannelName] = useState(""),
     [editChannelLoading, setEditChannelLoading] = useState(false),
     [serverUsers, setServerUsers] = useState<ServerUser[]>([]),
-    [myRole, setMyRole] = useState<Role>("user");
+    [myRole, setMyRole] = useState<Role>("user"),
+    [isAtBottom, setIsAtBottom] = useState(true),
+    [unreadBelowCount, setUnreadBelowCount] = useState(0);
   const en = settings.language === "en";
   const mediaRef = useRef<HTMLDivElement>(null),
     deafenedRef = useRef(false),
@@ -486,7 +488,9 @@ function App() {
     fileInputRef = useRef<HTMLInputElement>(null),
     wsRef = useRef<WebSocket | null>(null),
     remoteGainsRef = useRef<Record<string, GainNode>>({}),
-    lastTypingSentRef = useRef<number>(0);
+    lastTypingSentRef = useRef<number>(0),
+    messagesContainerRef = useRef<HTMLDivElement>(null),
+    isAtBottomRef = useRef(true);
   const headers = {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
@@ -548,6 +552,18 @@ function App() {
                 });
                 if (newMsg.username !== usernameRef.current) {
                   playSound("message");
+                }
+                if (isAtBottomRef.current) {
+                  setTimeout(() => {
+                    if (messagesContainerRef.current) {
+                      messagesContainerRef.current.scrollTo({
+                        top: messagesContainerRef.current.scrollHeight,
+                        behavior: "smooth",
+                      });
+                    }
+                  }, 40);
+                } else {
+                  setUnreadBelowCount((c) => c + 1);
                 }
               }
               if (newMsg?.username) {
@@ -1077,7 +1093,17 @@ function App() {
       `${API()}/api/channels/${activeText!.id}/messages`,
       { headers },
     );
-    if (response.ok) setMessages(await response.json());
+    if (response.ok) {
+      setMessages(await response.json());
+      setIsAtBottom(true);
+      isAtBottomRef.current = true;
+      setUnreadBelowCount(0);
+      setTimeout(() => {
+        if (messagesContainerRef.current) {
+          messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+        }
+      }, 50);
+    }
   }
   async function send() {
     if ((!text.trim() && !attachment) || !activeText) return;
@@ -1109,6 +1135,17 @@ function App() {
         });
       }
       playSound("message");
+      setIsAtBottom(true);
+      isAtBottomRef.current = true;
+      setUnreadBelowCount(0);
+      setTimeout(() => {
+        if (messagesContainerRef.current) {
+          messagesContainerRef.current.scrollTo({
+            top: messagesContainerRef.current.scrollHeight,
+            behavior: "smooth",
+          });
+        }
+      }, 50);
     } catch {
       playSound("error");
       setText(body);
@@ -2223,7 +2260,21 @@ function App() {
           </section>
         )}
         <section className="chat">
-          <div className="messages">
+          <div
+            className="messages"
+            ref={messagesContainerRef}
+            onScroll={() => {
+              const el = messagesContainerRef.current;
+              if (!el) return;
+              const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+              const atBottom = distanceFromBottom < 80;
+              setIsAtBottom(atBottom);
+              isAtBottomRef.current = atBottom;
+              if (atBottom) {
+                setUnreadBelowCount(0);
+              }
+            }}
+          >
             {!messages.length && (
               <div className="empty">
                 <i>#</i>
@@ -2375,6 +2426,37 @@ function App() {
                 </div>
               ))}
           </div>
+          {!isAtBottom && (
+            <button
+              type="button"
+              className="discordScrollToBottomBtn"
+              onClick={() => {
+                if (messagesContainerRef.current) {
+                  messagesContainerRef.current.scrollTo({
+                    top: messagesContainerRef.current.scrollHeight,
+                    behavior: "smooth",
+                  });
+                }
+                setIsAtBottom(true);
+                isAtBottomRef.current = true;
+                setUnreadBelowCount(0);
+              }}
+              title={en ? "Scroll to bottom" : "Перейти к последним сообщениям"}
+            >
+              {unreadBelowCount > 0 ? (
+                <>
+                  <span className="unreadBadgePill">{unreadBelowCount}</span>
+                  <span>{en ? "New messages" : "Новые сообщения"}</span>
+                  <span className="scrollDownArrow">↓</span>
+                </>
+              ) : (
+                <>
+                  <span>{en ? "To latest messages" : "К последним сообщениям"}</span>
+                  <span className="scrollDownArrow">↓</span>
+                </>
+              )}
+            </button>
+          )}
           <div className="discordComposerContainer">
             {replyTo && (
               <div className="discordReplyBar">

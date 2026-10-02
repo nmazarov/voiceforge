@@ -2902,5 +2902,81 @@ body { font-size: 14px; }
   }
 }
 
+/* ==========================================================================
+   Floating Scroll-to-Bottom & Unread Indicator Button
+   ========================================================================== */
+.chat {
+  position: relative !important;
+}
+
+.discordScrollToBottomBtn {
+  position: absolute;
+  bottom: 84px;
+  right: 28px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #5865f2, #7c3aed);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45), 0 0 14px rgba(88, 101, 242, 0.45);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  z-index: 20;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: scrollBtnAppear 0.22s ease-out;
+  user-select: none;
+}
+
+.discordScrollToBottomBtn:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55), 0 0 18px rgba(124, 58, 237, 0.6);
+  background: linear-gradient(135deg, #4752c4, #6d28d9);
+}
+
+.discordScrollToBottomBtn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.discordScrollToBottomBtn .unreadBadgePill {
+  background: #ed4245;
+  color: #fff;
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: 0 0 8px rgba(237, 66, 69, 0.6);
+}
+
+.discordScrollToBottomBtn .scrollDownArrow {
+  font-size: 14px;
+  font-weight: 800;
+  display: inline-block;
+  animation: arrowBounce 1.4s infinite ease-in-out;
+}
+
+@keyframes scrollBtnAppear {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes arrowBounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(3px);
+  }
+}
+
 
 
