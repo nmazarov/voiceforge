@@ -2996,5 +2996,86 @@ body { font-size: 14px; }
   }
 }
 
+/* Drag and Drop File Upload Overlay */
+.chat {
+  position: relative;
+}
 
+.discordDragDropOverlay {
+  position: absolute;
+  inset: 12px;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 18, 28, 0.88);
+  border: 2px dashed #7c3aed;
+  border-radius: 16px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: none;
+  animation: dragDropFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  box-shadow: 0 0 35px rgba(124, 58, 237, 0.3), inset 0 0 40px rgba(124, 58, 237, 0.12);
+}
 
+.discordDragDropContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 32px 40px;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.18) 0%, rgba(17, 21, 33, 0) 70%);
+  border-radius: 16px;
+}
+
+.discordDragDropIconWrap {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.28), rgba(99, 102, 241, 0.22));
+  border: 1px solid rgba(139, 92, 246, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  color: #c4b5fd;
+  animation: pulseUploadIcon 1.8s infinite ease-in-out;
+  box-shadow: 0 0 24px rgba(124, 58, 237, 0.45);
+}
+
+.discordDragDropContent h3 {
+  margin: 0 0 8px;
+  font-size: 19px;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: -0.3px;
+}
+
+.discordDragDropContent p {
+  margin: 0;
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+@keyframes dragDropFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulseUploadIcon {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 0 20px rgba(124, 58, 237, 0.4);
+  }
+  50% {
+    transform: translateY(-5px) scale(1.06);
+    box-shadow: 0 8px 30px rgba(124, 58, 237, 0.7);
+  }
+}

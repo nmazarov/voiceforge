@@ -23,6 +23,7 @@ import {
   PhoneHangupIcon,
   VolumeUpIcon,
   VolumeMuteIcon,
+  UploadIcon,
 } from "./icons";
 
 type Channel = { id: number; name: string; type: "text" | "voice" };
@@ -488,7 +489,8 @@ function App() {
     [serverUsers, setServerUsers] = useState<ServerUser[]>([]),
     [myRole, setMyRole] = useState<Role>("user"),
     [isAtBottom, setIsAtBottom] = useState(true),
-    [unreadBelowCount, setUnreadBelowCount] = useState(0);
+    [unreadBelowCount, setUnreadBelowCount] = useState(0),
+    [isDraggingFile, setIsDraggingFile] = useState(false);
   const en = settings.language === "en";
   const mediaRef = useRef<HTMLDivElement>(null),
     deafenedRef = useRef(false),
@@ -502,7 +504,8 @@ function App() {
     remoteGainsRef = useRef<Record<string, GainNode>>({}),
     lastTypingSentRef = useRef<number>(0),
     messagesContainerRef = useRef<HTMLDivElement>(null),
-    isAtBottomRef = useRef(true);
+    isAtBottomRef = useRef(true),
+    dragCounterRef = useRef(0);
   const headers = {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
@@ -1167,6 +1170,21 @@ function App() {
     }
   }
 
+  function processFile(file: File) {
+    if (file.size > 5 * 1024 * 1024) {
+      setNotice(en ? "File is too large (max 5MB)" : "Файл слишком большой (максимум 5 МБ)");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (typeof event.target?.result === "string") {
+        setAttachment(event.target.result);
+        playSound("click");
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
   function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
     const items = e.clipboardData?.items;
     if (!items) return;
@@ -1174,14 +1192,7 @@ function App() {
       if (items[i].type.indexOf("image") !== -1) {
         const file = items[i].getAsFile();
         if (file) {
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            if (typeof event.target?.result === "string") {
-              setAttachment(event.target.result);
-              playSound("click");
-            }
-          };
-          reader.readAsDataURL(file);
+          processFile(file);
           e.preventDefault();
           break;
         }
@@ -1192,20 +1203,45 @@ function App() {
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setNotice(en ? "File is too large (max 5MB)" : "Файл слишком большой (максимум 5 МБ)");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (typeof event.target?.result === "string") {
-          setAttachment(event.target.result);
-          playSound("click");
-        }
-      };
-      reader.readAsDataURL(file);
+      processFile(file);
     }
     if (e.target) e.target.value = "";
+  }
+
+  function handleDragEnter(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types && Array.from(e.dataTransfer.types).includes("Files")) {
+      setIsDraggingFile(true);
+    }
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "copy";
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setIsDraggingFile(false);
+    }
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDraggingFile(false);
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      processFile(files[0]);
+    }
   }
   function startVoiceActivityGate(roomInstance: Room, currentSettings: ClientSettings) {
     if (noiseGateRef.current) {
@@ -2274,7 +2310,32 @@ function App() {
             </div>
           </section>
         )}
-        <section className="chat">
+        <section
+          className="chat"
+          onDragEnter={handleDragEnter}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {isDraggingFile && (
+            <div className="discordDragDropOverlay">
+              <div className="discordDragDropContent">
+                <div className="discordDragDropIconWrap">
+                  <UploadIcon size={48} />
+                </div>
+                <h3>
+                  {en
+                    ? `Upload to #${activeText?.name || "chat"}`
+                    : `Загрузить в #${activeText?.name || "чат"}`}
+                </h3>
+                <p>
+                  {en
+                    ? "Drop image or file here (up to 5 MB)"
+                    : "Перетащите изображение или файл сюда (до 5 МБ)"}
+                </p>
+              </div>
+            </div>
+          )}
           <div
             className="messages"
             ref={messagesContainerRef}
