@@ -2690,7 +2690,8 @@ body { font-size: 14px; }
   border-radius: 8px;
   margin-bottom: 2px;
   cursor: pointer;
-  transition: background 0.12s ease;
+  border: 1px solid transparent;
+  transition: background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
 }
 .discordMemberItem:hover {
   background: #171d2b;
@@ -2777,6 +2778,117 @@ body { font-size: 14px; }
   background: rgba(239, 68, 68, 0.2);
   border-color: #ef4444;
   color: #ff6b7b;
+}
+
+/* ==========================================================================
+   Speaking Glow & Live Voice Activity Indicators
+   ========================================================================== */
+.discordMemberItem.speaking {
+  background: rgba(35, 165, 90, 0.12) !important;
+  border: 1px solid rgba(35, 165, 90, 0.5) !important;
+  box-shadow: 0 0 14px rgba(35, 165, 90, 0.28), inset 0 0 10px rgba(35, 165, 90, 0.1) !important;
+  animation: speakingCardPulse 1.6s ease-in-out infinite alternate;
+}
+
+.discordMemberItem.speaking:hover {
+  background: rgba(35, 165, 90, 0.18) !important;
+  border-color: rgba(35, 165, 90, 0.7) !important;
+}
+
+.discordChannelUserRow.speaking {
+  color: #4ade80 !important;
+  background: rgba(35, 165, 90, 0.12) !important;
+  border: 1px solid rgba(35, 165, 90, 0.45) !important;
+  box-shadow: 0 0 10px rgba(35, 165, 90, 0.22) !important;
+  animation: speakingCardPulse 1.6s ease-in-out infinite alternate;
+}
+
+.discordChannelUserStatusDot {
+  font-size: 10px;
+  color: #23a55a;
+  flex-shrink: 0;
+  line-height: 1;
+  display: inline-block;
+}
+
+.discordMemberStatusDot.speakingDot,
+.discordChannelUserStatusDot.speakingDot {
+  color: #23a55a !important;
+  animation: speakingNeonPulse 1.2s ease-in-out infinite alternate;
+}
+
+.speakingName {
+  color: #4ade80 !important;
+  text-shadow: 0 0 8px rgba(35, 165, 90, 0.65);
+}
+
+.speakingSubtext {
+  color: #4ade80 !important;
+  font-weight: 600;
+  text-shadow: 0 0 6px rgba(35, 165, 90, 0.4);
+}
+
+/* Animated Equalizer Wave */
+.speakingWaveMini {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 11px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.speakingWaveMini span {
+  display: block;
+  width: 2.5px;
+  background: #23a55a;
+  border-radius: 2px;
+  box-shadow: 0 0 4px rgba(35, 165, 90, 0.85);
+  animation: speakingWaveAnim 0.65s ease-in-out infinite alternate;
+}
+
+.speakingWaveMini span:nth-child(1) {
+  height: 3px;
+  animation-delay: 0.1s;
+}
+
+.speakingWaveMini span:nth-child(2) {
+  height: 10px;
+  animation-delay: 0.35s;
+}
+
+.speakingWaveMini span:nth-child(3) {
+  height: 6px;
+  animation-delay: 0.2s;
+}
+
+@keyframes speakingWaveAnim {
+  0% {
+    height: 3px;
+  }
+  100% {
+    height: 11px;
+  }
+}
+
+@keyframes speakingNeonPulse {
+  0% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 2px #23a55a);
+  }
+  100% {
+    transform: scale(1.4);
+    filter: drop-shadow(0 0 8px #23a55a) drop-shadow(0 0 14px rgba(35, 165, 90, 0.8));
+  }
+}
+
+@keyframes speakingCardPulse {
+  0% {
+    box-shadow: 0 0 8px rgba(35, 165, 90, 0.2), inset 0 0 6px rgba(35, 165, 90, 0.08);
+  }
+  100% {
+    box-shadow: 0 0 16px rgba(35, 165, 90, 0.38), inset 0 0 12px rgba(35, 165, 90, 0.15);
+  }
 }
 
 

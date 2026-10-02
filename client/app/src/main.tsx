@@ -1152,10 +1152,28 @@ function App() {
             isTrackEnabled = true;
             mediaStreamTrack.enabled = true;
           }
+          if (username) {
+            setParticipantStates((current) => {
+              if (current[username]?.speaking) return current;
+              return {
+                ...current,
+                [username]: { mic: !muted, speaking: true },
+              };
+            });
+          }
         } else if (now > speakingUntil) {
           if (isTrackEnabled) {
             isTrackEnabled = false;
             mediaStreamTrack.enabled = false;
+          }
+          if (username) {
+            setParticipantStates((current) => {
+              if (!current[username]?.speaking) return current;
+              return {
+                ...current,
+                [username]: { mic: current[username]?.mic ?? !muted, speaking: false },
+              };
+            });
           }
         }
 
@@ -1764,15 +1782,24 @@ function App() {
                 </div>
                 {voice === channel.name && (
                   <div className="discordChannelUsers">
-                    {participants.map((participant) => (
-                      <div
-                        className={`discordChannelUserRow ${participantStates[participant]?.speaking ? "speaking" : ""} ${remoteStreams.some((stream) => stream.name === participant && stream.video) || (participant === username && streamStatus === "live") ? "isStreaming" : ""}`}
-                        key={participant}
-                      >
-                        <div className="userAvatarWrap">
-                          <Avatar name={participant} small />
-                        </div>
-                        <span className="userNameText">{participant}</span>
+                    {participants.map((participant) => {
+                      const isSpeaking = Boolean(participantStates[participant]?.speaking);
+                      return (
+                        <div
+                          className={`discordChannelUserRow ${isSpeaking ? "speaking" : ""} ${remoteStreams.some((stream) => stream.name === participant && stream.video) || (participant === username && streamStatus === "live") ? "isStreaming" : ""}`}
+                          key={participant}
+                        >
+                          <span
+                            className={`discordChannelUserStatusDot ${isSpeaking ? "speakingDot" : ""}`}
+                          >
+                            ●
+                          </span>
+                          <span className={`userNameText ${isSpeaking ? "speakingName" : ""}`}>{participant}</span>
+                          {isSpeaking && (
+                            <span className="speakingWaveMini" title={en ? "Speaking" : "Говорит"}>
+                              <span /><span /><span />
+                            </span>
+                          )}
                         {participant === username && streamStatus === "live" && (
                           <span className="userLiveBadge own"><i />{en ? "LIVE" : "ЭФИР"}</span>
                         )}
@@ -1809,7 +1836,8 @@ function App() {
                           </button>
                         )}
                       </div>
-                    ))}
+                    );
+                  })}
                   </div>
                 )}
               </React.Fragment>
@@ -2427,31 +2455,47 @@ function App() {
                 const uRole = getUserRole(participant);
                 const badge = getRoleBadge(uRole, en);
                 const isOnline = participants.length === 0 || participants.includes(participant);
+                const isSpeaking = Boolean(participantStates[participant]?.speaking);
                 return (
                   <div
-                    className={`discordMemberItem ${participant !== username ? "clickable" : ""}`}
+                    className={`discordMemberItem ${participant !== username ? "clickable" : ""} ${isSpeaking ? "speaking" : ""}`}
                     key={participant}
                     onClick={() => participant !== username && setVolumeMenuUser(participant)}
                     title={participant !== username ? (en ? `Volume: ${userVolumes[participant] ?? 100}% (click to adjust)` : `Громкость: ${userVolumes[participant] ?? 100}% (нажмите для настройки)`) : undefined}
                   >
                     <span
-                      className="discordMemberStatusDot"
-                      style={{ color: isOnline ? "#23a55a" : "#747f8d" }}
+                      className={`discordMemberStatusDot ${isSpeaking ? "speakingDot" : ""}`}
+                      style={{ color: isSpeaking ? "#23a55a" : isOnline ? "#23a55a" : "#747f8d" }}
                     >
                       ●
                     </span>
                     <div className="discordMemberInfo">
                       <div className="discordMemberNameRow">
                         <b
-                          className="discordMemberNameText"
-                          style={{ color: uRole !== "user" ? badge.color : "#dbdee1" }}
+                          className={`discordMemberNameText ${isSpeaking ? "speakingName" : ""}`}
+                          style={{ color: isSpeaking ? "#4ade80" : uRole !== "user" ? badge.color : "#dbdee1" }}
                         >
                           {participant}
                         </b>
                         <RoleBadge role={uRole} en={en} />
+                        {isSpeaking && (
+                          <span className="speakingWaveMini" title={en ? "Speaking" : "Говорит"}>
+                            <span /><span /><span />
+                          </span>
+                        )}
                       </div>
                       <small className="discordMemberSubtext">
-                        {voice ? (en ? "In voice channel" : "В голосовом канале") : isOnline ? "Online" : "Offline"}
+                        {isSpeaking ? (
+                          <span className="speakingSubtext">
+                            🎙️ {en ? "Speaking" : "Говорит"}
+                          </span>
+                        ) : voice ? (
+                          en ? "In voice channel" : "В голосовом канале"
+                        ) : isOnline ? (
+                          "Online"
+                        ) : (
+                          "Offline"
+                        )}
                         {participant !== username && (userVolumes[participant] ?? 100) !== 100 && (
                           <span className="memberVolTag"> • {userVolumes[participant]}%</span>
                         )}
