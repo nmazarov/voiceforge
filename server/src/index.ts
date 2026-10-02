@@ -32,6 +32,17 @@ const cols=db.prepare('PRAGMA table_info(users)').all() as any[];
 if(!cols.some(c=>c.name==='role'))db.exec(`ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'`);
 if(!cols.some(c=>c.name==='disabled'))db.exec(`ALTER TABLE users ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0`);
 if(!cols.some(c=>c.name==='created_at'))db.exec(`ALTER TABLE users ADD COLUMN created_at TEXT`);
+if(!cols.some(c=>c.name==='avatar'))db.exec(`ALTER TABLE users ADD COLUMN avatar TEXT`);
+if(!cols.some(c=>c.name==='custom_status'))db.exec(`ALTER TABLE users ADD COLUMN custom_status TEXT`);
+if(!cols.some(c=>c.name==='presence'))db.exec(`ALTER TABLE users ADD COLUMN presence TEXT NOT NULL DEFAULT 'offline'`);
+const msgCols=db.prepare('PRAGMA table_info(messages)').all() as any[];
+if(!msgCols.some(c=>c.name==='edited_at'))db.exec(`ALTER TABLE messages ADD COLUMN edited_at TEXT`);
+if(!msgCols.some(c=>c.name==='reply_to_id'))db.exec(`ALTER TABLE messages ADD COLUMN reply_to_id INTEGER`);
+if(!msgCols.some(c=>c.name==='attachment_url'))db.exec(`ALTER TABLE messages ADD COLUMN attachment_url TEXT`);
+if(!msgCols.some(c=>c.name==='attachment_name'))db.exec(`ALTER TABLE messages ADD COLUMN attachment_name TEXT`);
+db.exec(`CREATE TABLE IF NOT EXISTS reactions(id INTEGER PRIMARY KEY AUTOINCREMENT,message_id INTEGER NOT NULL,user_id INTEGER NOT NULL,username TEXT NOT NULL,emoji TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE(message_id,user_id,emoji));
+CREATE INDEX IF NOT EXISTS idx_reactions_msg ON reactions(message_id);
+CREATE INDEX IF NOT EXISTS idx_messages_chan ON messages(channel_id,id);`);
 db.exec(`UPDATE users SET role='admin' WHERE is_admin=1 AND role='user'`);
 if(!db.prepare('SELECT 1 FROM channels LIMIT 1').get()){const q=db.prepare('INSERT INTO channels(name,type) VALUES (?,?)');q.run('general','text');q.run('General','voice');q.run('Gaming','voice')}
 
@@ -41,7 +52,7 @@ async function hashPassword(value:string){const salt=crypto.randomBytes(16).toSt
 async function verifyPassword(value:string,stored:string){if(!stored.startsWith('scrypt$'))return stored===Buffer.from(`${value}:${JWT_SECRET}`).toString('base64url');const [,salt,hex]=stored.split('$');const expected=Buffer.from(hex,'hex');const actual=await scryptAsync(value,salt,expected.length) as Buffer;return expected.length===actual.length&&crypto.timingSafeEqual(expected,actual)}
 const sha256=(v:string)=>crypto.createHash('sha256').update(v).digest('hex');
 function safeHex(a:string,b:string){try{const x=Buffer.from(a,'hex'),y=Buffer.from(b,'hex');return x.length>0&&x.length===y.length&&crypto.timingSafeEqual(x,y)}catch{return false}}
-const sign=(u:User,remember=false)=>jwt.sign(u,JWT_SECRET,{expiresIn:remember?'30d':'12h'});
+const sign=(u:User,remember=true)=>jwt.sign(u,JWT_SECRET,{expiresIn:remember?'365d':'30d'});
 function auth(req:any):User|null{const raw=req.headers.authorization?.replace(/^Bearer\s+/,'');if(!raw)return null;try{return jwt.verify(raw,JWT_SECRET) as User}catch{return null}}
 function requireRole(req:any,reply:any,roles:Role[]){const u=auth(req);if(!u){reply.code(401).send({error:'Unauthorized'});return null}const row=db.prepare('SELECT role,disabled FROM users WHERE id=?').get(u.id) as any;if(!row||row.disabled){reply.code(403).send({error:'Account disabled'});return null}if(!roles.includes(row.role)){reply.code(403).send({error:'Insufficient permissions'});return null}return {...u,role:row.role,disabled:row.disabled} as User}
 function audit(actor:number|null,action:string,targetType?:string,targetId?:string,details?:unknown){db.prepare('INSERT INTO audit_log(actor_user_id,action,target_type,target_id,details) VALUES (?,?,?,?,?)').run(actor,action,targetType||null,targetId||null,details?JSON.stringify(details):null)}
@@ -54,9 +65,9 @@ const app=Fastify({logger:true});
 await app.register(cors,{origin:true});
 await app.register(websocket);
 app.get('/admin',async(_req,reply)=>reply.type('text/html; charset=utf-8').send(ADMIN_HTML));
-app.get('/api/health',async()=>({ok:true,name:'VoiceForge',version:'1.0.0',mode:'server',admin:'/admin'}));
-app.post('/api/auth/register',async(req,reply)=>{const b=z.object({username:z.string().min(2).max(32).regex(/^[a-zA-Z0-9_.-]+$/),password:z.string().min(8).max(128)}).parse(req.body);if(db.prepare('SELECT id FROM users WHERE username=?').get(b.username))return reply.code(409).send({error:'Username already exists'});const info=db.prepare(`INSERT INTO users(username,password,role,created_at) VALUES (?,?,'user',CURRENT_TIMESTAMP)`).run(b.username,await hashPassword(b.password));const user={id:Number(info.lastInsertRowid),username:b.username,role:'user' as Role,disabled:0};audit(user.id,'register','user',String(user.id));return{token:sign(user),user}});
-app.post('/api/auth/login',async(req,reply)=>{const b=z.object({username:z.string(),password:z.string(),remember:z.boolean().optional().default(false)}).parse(req.body);const row=db.prepare('SELECT id,username,password,role,disabled FROM users WHERE username=?').get(b.username) as any;if(!row||row.disabled||!(await verifyPassword(b.password,row.password)))return reply.code(401).send({error:'Invalid credentials'});if(!row.password.startsWith('scrypt$'))db.prepare('UPDATE users SET password=? WHERE id=?').run(await hashPassword(b.password),row.id);const user={id:row.id,username:row.username,role:row.role as Role,disabled:row.disabled};audit(user.id,'login',undefined,undefined,{remember:b.remember});return{token:sign(user,b.remember),user}});
+app.get('/api/health',async()=>({ok:true,name:'VoiceForge',version:'1.1.0',mode:'server',admin:'/admin'}));
+app.post('/api/auth/register',async(req,reply)=>{const b=z.object({username:z.string().min(2).max(32).regex(/^[a-zA-Z0-9_.-]+$/),password:z.string().min(8).max(128),remember:z.boolean().optional().default(true)}).parse(req.body);if(db.prepare('SELECT id FROM users WHERE username=?').get(b.username))return reply.code(409).send({error:'Username already exists'});const info=db.prepare(`INSERT INTO users(username,password,role,created_at) VALUES (?,?,'user',CURRENT_TIMESTAMP)`).run(b.username,await hashPassword(b.password));const user={id:Number(info.lastInsertRowid),username:b.username,role:'user' as Role,disabled:0};audit(user.id,'register','user',String(user.id));return{token:sign(user,b.remember),user}});
+app.post('/api/auth/login',async(req,reply)=>{const b=z.object({username:z.string(),password:z.string(),remember:z.boolean().optional().default(true)}).parse(req.body);const row=db.prepare('SELECT id,username,password,role,disabled FROM users WHERE username=?').get(b.username) as any;if(!row||row.disabled||!(await verifyPassword(b.password,row.password)))return reply.code(401).send({error:'Invalid credentials'});if(!row.password.startsWith('scrypt$'))db.prepare('UPDATE users SET password=? WHERE id=?').run(await hashPassword(b.password),row.id);const user={id:row.id,username:row.username,role:row.role as Role,disabled:row.disabled};audit(user.id,'login',undefined,undefined,{remember:b.remember});return{token:sign(user,b.remember),user}});
 app.get('/api/auth/session',async(req,reply)=>{const user=auth(req);if(!user)return reply.code(401).send({error:'Session expired'});const row=db.prepare('SELECT id,username,role,disabled FROM users WHERE id=?').get(user.id) as any;if(!row||row.disabled)return reply.code(403).send({error:'Account disabled'});return{user:row}});
 app.post('/api/admin/key-login',async(req,reply)=>{const {key}=z.object({key:z.string().min(32).max(256)}).parse(req.body);if(!ADMIN_KEY_HASH||!safeHex(sha256(key),ADMIN_KEY_HASH))return reply.code(401).send({error:'Invalid admin key'});const owner=db.prepare(`SELECT id,username,role,disabled FROM users WHERE role='owner' AND disabled=0 ORDER BY id LIMIT 1`).get() as any;if(!owner)return reply.code(503).send({error:'Owner account is not initialized'});audit(owner.id,'admin_key_login');return{token:sign(owner),user:owner}});
 app.get('/api/admin/overview',async(req,reply)=>{const u=requireRole(req,reply,['admin','owner']);if(!u)return;return{users:(db.prepare('SELECT COUNT(*) c FROM users').get() as any).c,admins:(db.prepare(`SELECT COUNT(*) c FROM users WHERE role IN ('admin','owner')`).get() as any).c,blocked:(db.prepare('SELECT COUNT(*) c FROM users WHERE disabled=1').get() as any).c,channels:(db.prepare('SELECT COUNT(*) c FROM channels').get() as any).c,messages:(db.prepare('SELECT COUNT(*) c FROM messages').get() as any).c}});
@@ -65,8 +76,98 @@ app.patch('/api/admin/users/:id',async(req:any,reply)=>{const actor=requireRole(
 app.post('/api/admin/channels',async(req,reply)=>{const actor=requireRole(req,reply,['admin','owner']);if(!actor)return;const b=z.object({name:z.string().min(1).max(64),type:z.enum(['text','voice'])}).parse(req.body);const info=db.prepare('INSERT INTO channels(name,type) VALUES (?,?)').run(b.name,b.type);audit(actor.id,'create_channel','channel',String(info.lastInsertRowid),b);return{id:Number(info.lastInsertRowid),...b}});
 app.delete('/api/admin/channels/:id',async(req:any,reply)=>{const actor=requireRole(req,reply,['admin','owner']);if(!actor)return;const id=Number(req.params.id);db.prepare('DELETE FROM channels WHERE id=?').run(id);audit(actor.id,'delete_channel','channel',String(id));return{ok:true}});
 app.get('/api/admin/audit',async(req,reply)=>{const actor=requireRole(req,reply,['owner']);if(!actor)return;return db.prepare(`SELECT a.*,u.username actor_username FROM audit_log a LEFT JOIN users u ON u.id=a.actor_user_id ORDER BY a.id DESC LIMIT 250`).all()});
+const wsClients = new Set<any>();
+function broadcast(event: string, payload: any) {
+  const data = JSON.stringify({ event, payload });
+  for (const client of wsClients) {
+    try {
+      if (client.readyState === 1) client.send(data);
+    } catch {}
+  }
+}
+app.get('/api/ws', { websocket: true }, (connection, req) => {
+  const url = new URL(req.url, 'http://localhost');
+  const token = url.searchParams.get('token') || req.headers.authorization?.replace(/^Bearer\s+/, '');
+  let user: User | null = null;
+  if (token) {
+    try { user = jwt.verify(token, JWT_SECRET) as User; } catch {}
+  }
+  if (!user) {
+    connection.socket.close(4001, 'Unauthorized');
+    return;
+  }
+  wsClients.add(connection.socket);
+  connection.socket.send(JSON.stringify({ event: 'connected', user: { id: user.id, username: user.username } }));
+  connection.socket.on('message', (raw: any) => {
+    try {
+      const data = JSON.parse(raw.toString());
+      if (data.event === 'reaction') {
+        broadcast('message:reaction', {
+          channelId: data.channelId,
+          messageId: data.messageId,
+          emoji: data.emoji,
+          username: user!.username,
+        });
+      }
+    } catch {}
+  });
+  connection.socket.on('close', () => {
+    wsClients.delete(connection.socket);
+  });
+});
 app.get('/api/channels',async()=>db.prepare('SELECT id,name,type FROM channels ORDER BY type,id').all());
-app.get('/api/channels/:id/messages',async(req:any,reply)=>{const u=auth(req);if(!u)return reply.code(401).send({error:'Unauthorized'});return db.prepare(`SELECT m.id,m.body,m.created_at,u.username FROM messages m JOIN users u ON u.id=m.user_id WHERE m.channel_id=? ORDER BY m.id DESC LIMIT 100`).all(req.params.id).reverse()});
-app.post('/api/channels/:id/messages',async(req:any,reply)=>{const u=auth(req);if(!u)return reply.code(401).send({error:'Unauthorized'});const row=db.prepare('SELECT disabled FROM users WHERE id=?').get(u.id) as any;if(!row||row.disabled)return reply.code(403).send({error:'Account disabled'});const {body}=z.object({body:z.string().min(1).max(2000)}).parse(req.body);db.prepare('INSERT INTO messages(channel_id,user_id,body) VALUES (?,?,?)').run(req.params.id,u.id,body);return{ok:true}});
+app.get('/api/channels/:id/messages',async(req:any,reply)=>{
+  const u=auth(req);
+  if(!u)return reply.code(401).send({error:'Unauthorized'});
+  const raw=db.prepare(`
+    SELECT m.id,m.body,m.created_at,m.reply_to_id,m.attachment_url,u.username,
+           r.username as reply_user,r.body as reply_body
+    FROM messages m
+    JOIN users u ON u.id=m.user_id
+    LEFT JOIN messages r ON r.id=m.reply_to_id
+    WHERE m.channel_id=?
+    ORDER BY m.id DESC LIMIT 100
+  `).all(req.params.id).reverse() as any[];
+  return raw.map(m=>({
+    id:m.id,
+    body:m.body,
+    created_at:m.created_at,
+    username:m.username,
+    attachment:m.attachment_url,
+    reply_to:m.reply_to_id?{id:m.reply_to_id,username:m.reply_user||'user',body:m.reply_body||''}:null,
+    reactions:{}
+  }));
+});
+app.post('/api/channels/:id/messages',async(req:any,reply)=>{
+  const u=auth(req);
+  if(!u)return reply.code(401).send({error:'Unauthorized'});
+  const row=db.prepare('SELECT disabled FROM users WHERE id=?').get(u.id) as any;
+  if(!row||row.disabled)return reply.code(403).send({error:'Account disabled'});
+  const {body,reply_to,attachment}=z.object({
+    body:z.string().min(1).max(5000),
+    reply_to:z.object({id:z.number(),username:z.string(),body:z.string()}).nullable().optional(),
+    attachment:z.string().nullable().optional()
+  }).parse(req.body);
+  const info=db.prepare('INSERT INTO messages(channel_id,user_id,body,reply_to_id,attachment_url) VALUES (?,?,?,?,?)').run(
+    req.params.id,
+    u.id,
+    body,
+    reply_to?reply_to.id:null,
+    attachment||null
+  );
+  const msg={
+    id:Number(info.lastInsertRowid),
+    channel_id:Number(req.params.id),
+    user_id:u.id,
+    username:u.username,
+    body,
+    reply_to:reply_to||null,
+    attachment:attachment||null,
+    reactions:{},
+    created_at:new Date().toISOString()
+  };
+  broadcast('message:created',msg);
+  return msg;
+});
 app.post('/api/livekit/token',async(req:any,reply)=>{const u=auth(req);if(!u)return reply.code(401).send({error:'Unauthorized'});const row=db.prepare('SELECT disabled FROM users WHERE id=?').get(u.id) as any;if(!row||row.disabled)return reply.code(403).send({error:'Account disabled'});const {room}=z.object({room:z.string().min(1).max(64)}).parse(req.body);const t=new AccessToken(LIVEKIT_API_KEY,LIVEKIT_API_SECRET,{identity:String(u.id),name:u.username});t.addGrant({roomJoin:true,room,canPublish:true,canSubscribe:true,canPublishData:true});return{token:await t.toJwt(),url:LIVEKIT_PUBLIC_URL}});
 await app.listen({port:PORT,host:'0.0.0.0'});

@@ -14,7 +14,15 @@ import "./style.css";
 import "./enhancements.css";
 
 type Channel = { id: number; name: string; type: "text" | "voice" };
-type Msg = { id: number; body: string; created_at: string; username: string };
+type Msg = {
+  id: number;
+  body: string;
+  created_at: string;
+  username: string;
+  reply_to?: { id: number; username: string; body: string } | null;
+  attachment?: string | null;
+  reactions?: Record<string, string[]>;
+};
 type DesktopSource = {
   id: string;
   name: string;
@@ -59,6 +67,8 @@ type ClientSettings = {
   noiseSuppression: boolean;
   echoCancellation: boolean;
   autoGainControl: boolean;
+  voiceThreshold: number;
+  autoThreshold: boolean;
 };
 const defaultSettings: ClientSettings = {
   language: "ru",
@@ -73,6 +83,8 @@ const defaultSettings: ClientSettings = {
   noiseSuppression: true,
   echoCancellation: true,
   autoGainControl: true,
+  voiceThreshold: 20,
+  autoThreshold: false,
 };
 function loadSettings(): ClientSettings {
   try {
@@ -89,10 +101,11 @@ const bridge = (window as unknown as { voiceforgeDesktop?: DesktopBridge })
 const desktop = Boolean(bridge?.isDesktop),
   platform = bridge?.platform || "web";
 const normalize = (value: string) => value.trim().replace(/\/$/, "");
-const API = () =>
-  desktop
-    ? normalize(localStorage.getItem("vf_server") || "")
-    : (import.meta as any).env.VITE_API_URL || "";
+const API = () => {
+  const envUrl = (import.meta as any).env.VITE_API_URL || "";
+  if (envUrl) return envUrl;
+  return normalize(localStorage.getItem("vf_server") || "");
+};
 const savedToken = () =>
   localStorage.getItem("vf_token") || sessionStorage.getItem("vf_token") || "";
 const savedUser = () =>
@@ -241,6 +254,112 @@ function StreamPreview({
   );
 }
 
+function SpoilerSpan({ text }: { text: string }) {
+  const [revealed, setRevealed] = useState(false);
+  return (
+    <span
+      className={`discordSpoiler ${revealed ? "revealed" : ""}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        setRevealed(!revealed);
+      }}
+      title="Спойлер (нажмите, чтобы показать)"
+    >
+      {text}
+    </span>
+  );
+}
+
+function parseInlineTokens(text: string): React.ReactNode[] {
+  const regex = /(\|\|.+?\|\||\*\*.+?\*\*|~~.+?~~|`[^`]+`|\*[^*]+\*|https?:\/\/[^\s]+)/g;
+  const parts = text.split(regex);
+  return parts.map((part, i) => {
+    if (!part) return null;
+    if (part.startsWith("||") && part.endsWith("||") && part.length >= 4) {
+      return <SpoilerSpan key={i} text={part.slice(2, -2)} />;
+    }
+    if (part.startsWith("**") && part.endsWith("**") && part.length >= 4) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith("~~") && part.endsWith("~~") && part.length >= 4) {
+      return <del key={i}>{part.slice(2, -2)}</del>;
+    }
+    if (part.startsWith("`") && part.endsWith("`") && part.length >= 2) {
+      return <code key={i} className="discordInlineCode">{part.slice(1, -1)}</code>;
+    }
+    if (part.startsWith("*") && part.endsWith("*") && part.length >= 2) {
+      return <em key={i}>{part.slice(1, -1)}</em>;
+    }
+    if (part.startsWith("http://") || part.startsWith("https://")) {
+      return (
+        <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="discordLink">
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+}
+
+function MarkdownMessage({ content }: { content: string }) {
+  if (content.includes("```")) {
+    const segments = content.split(/(```[\s\S]*?```)/g);
+    return (
+      <div className="messageText">
+        {segments.map((seg, idx) => {
+          if (seg.startsWith("```") && seg.endsWith("```")) {
+            const inner = seg.slice(3, -3).replace(/^\n/, "");
+            return (
+              <pre key={idx} className="discordCodeBlock">
+                <code>{inner}</code>
+              </pre>
+            );
+          }
+          return (
+            <p key={idx} className="messageParagraph">
+              {parseInlineTokens(seg)}
+            </p>
+          );
+        })}
+      </div>
+    );
+  }
+
+  const lines = content.split("\n");
+  const renderedLines: React.ReactNode[] = [];
+  let quoteBuffer: string[] = [];
+
+  const flushQuote = (key: number) => {
+    if (quoteBuffer.length > 0) {
+      renderedLines.push(
+        <blockquote key={`q-${key}`} className="discordQuote">
+          {quoteBuffer.map((line, qIdx) => (
+            <div key={qIdx}>{parseInlineTokens(line)}</div>
+          ))}
+        </blockquote>
+      );
+      quoteBuffer = [];
+    }
+  };
+
+  lines.forEach((line, index) => {
+    if (line.startsWith("> ") || line === ">") {
+      quoteBuffer.push(line.replace(/^>\s?/, ""));
+    } else {
+      flushQuote(index);
+      renderedLines.push(
+        <span key={`l-${index}`} className="messageLine">
+          {parseInlineTokens(line)}
+          {index < lines.length - 1 && <br />}
+        </span>
+      );
+    }
+  });
+  flushQuote(lines.length);
+
+  return <div className="messageText">{renderedLines}</div>;
+}
+
 function App() {
   useClickSounds();
   const [server, setServer] = useState(API()),
@@ -250,7 +369,10 @@ function App() {
   const [channels, setChannels] = useState<Channel[]>([]),
     [activeText, setActiveText] = useState<Channel | null>(null),
     [messages, setMessages] = useState<Msg[]>([]),
-    [text, setText] = useState("");
+    [text, setText] = useState(""),
+    [replyTo, setReplyTo] = useState<Msg | null>(null),
+    [attachment, setAttachment] = useState<string | null>(null),
+    [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [voice, setVoice] = useState(""),
     [participants, setParticipants] = useState<string[]>([]),
     [participantStates, setParticipantStates] = useState<Record<string, ParticipantState>>({}),
@@ -274,16 +396,29 @@ function App() {
     [membersVisible, setMembersVisible] = useState(true),
     [searchOpen, setSearchOpen] = useState(false),
     [searchQuery, setSearchQuery] = useState(""),
-    [moreOpen, setMoreOpen] = useState(false);
+    [moreOpen, setMoreOpen] = useState(false),
+    [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({}),
+    [ping, setPing] = useState<number | null>(null);
   const en = settings.language === "en";
   const mediaRef = useRef<HTMLDivElement>(null),
     deafenedRef = useRef(false),
     joiningRef = useRef(false),
-    muteBeforeDeafenRef = useRef(false);
+    muteBeforeDeafenRef = useRef(false),
+    activeTextRef = useRef<Channel | null>(null),
+    usernameRef = useRef<string>(username),
+    noiseGateRef = useRef<{ stop: () => void } | null>(null),
+    fileInputRef = useRef<HTMLInputElement>(null),
+    wsRef = useRef<WebSocket | null>(null);
   const headers = {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
   };
+  useEffect(() => {
+    activeTextRef.current = activeText;
+  }, [activeText]);
+  useEffect(() => {
+    usernameRef.current = username;
+  }, [username]);
   useEffect(() => {
     deafenedRef.current = deafened;
   }, [deafened]);
@@ -292,11 +427,115 @@ function App() {
     localStorage.setItem("vf_settings", JSON.stringify(settings));
   }, [settings]);
   useEffect(() => {
-    if (!desktop || server) void loadChannels();
+    if (server) void loadChannels();
+  }, [server]);
+  useEffect(() => {
+    if (!server) return;
+    const checkPing = async () => {
+      const start = performance.now();
+      try {
+        const res = await fetch(`${API()}/api/health`);
+        if (res.ok) setPing(Math.round(performance.now() - start));
+      } catch {}
+    };
+    void checkPing();
+    const interval = setInterval(checkPing, 8000);
+    return () => clearInterval(interval);
   }, [server]);
   useEffect(() => {
     if (activeText && token) void loadMessages();
   }, [activeText, token]);
+  useEffect(() => {
+    if (!token) return;
+    const base = API();
+    if (!base) return;
+    const wsUrl = base.replace(/^http/i, "ws") + `/api/ws?token=${encodeURIComponent(token)}`;
+    let ws: WebSocket | null = null;
+    let reconnectTimer: any = null;
+    let closedExplicitly = false;
+
+    function connect() {
+      try {
+        ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
+        ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.event === "message:created") {
+              const newMsg = data.payload as Msg & { channel_id: number };
+              if (activeTextRef.current && newMsg && newMsg.channel_id === activeTextRef.current.id) {
+                setMessages((prev) => {
+                  if (prev.some((m) => m.id === newMsg.id)) return prev;
+                  return [...prev, newMsg];
+                });
+                if (newMsg.username !== usernameRef.current) {
+                  playSound("message");
+                }
+              }
+            } else if (data.event === "message:reaction") {
+              const { messageId, emoji, username: reactingUser } = data.payload;
+              setMessages((prev) =>
+                prev.map((m) => {
+                  if (m.id !== messageId) return m;
+                  const currentReactions = { ...(m.reactions || {}) };
+                  const users = currentReactions[emoji] || [];
+                  if (users.includes(reactingUser)) {
+                    currentReactions[emoji] = users.filter((u) => u !== reactingUser);
+                    if (currentReactions[emoji].length === 0) delete currentReactions[emoji];
+                  } else {
+                    currentReactions[emoji] = [...users, reactingUser];
+                  }
+                  return { ...m, reactions: currentReactions };
+                })
+              );
+            }
+          } catch {}
+        };
+        ws.onclose = () => {
+          wsRef.current = null;
+          if (!closedExplicitly) {
+            reconnectTimer = setTimeout(connect, 3000);
+          }
+        };
+      } catch {}
+    }
+
+    connect();
+
+    return () => {
+      closedExplicitly = true;
+      wsRef.current = null;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (ws) ws.close();
+    };
+  }, [token, server]);
+  function toggleReaction(messageId: number, emoji: string) {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          event: "reaction",
+          channelId: activeTextRef.current?.id,
+          messageId,
+          emoji,
+        })
+      );
+    }
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.id !== messageId) return m;
+        const currentReactions = { ...(m.reactions || {}) };
+        const users = currentReactions[emoji] || [];
+        if (users.includes(usernameRef.current)) {
+          currentReactions[emoji] = users.filter((u) => u !== usernameRef.current);
+          if (currentReactions[emoji].length === 0) delete currentReactions[emoji];
+        } else {
+          currentReactions[emoji] = [...users, usernameRef.current];
+        }
+        return { ...m, reactions: currentReactions };
+      })
+    );
+    playSound("click");
+  }
   useEffect(() => {
     if (!notice) return;
     const timer = setTimeout(() => setNotice(""), 4500);
@@ -312,22 +551,32 @@ function App() {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(async (response) => {
-        if (!response.ok) throw new Error();
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            if (!active) return;
+            localStorage.removeItem("vf_token");
+            localStorage.removeItem("vf_user");
+            sessionStorage.removeItem("vf_token");
+            sessionStorage.removeItem("vf_user");
+            setToken("");
+            setSessionReady(true);
+            setNotice(en ? "Session expired. Sign in again." : "Сессия истекла. Войдите снова.");
+            return;
+          }
+          if (active) setSessionReady(true);
+          return;
+        }
         const data = await response.json();
         if (active) {
           setUsername(data.user.username);
+          localStorage.setItem("vf_user", data.user.username);
           setSessionReady(true);
         }
       })
       .catch(() => {
         if (!active) return;
-        localStorage.removeItem("vf_token");
-        localStorage.removeItem("vf_user");
-        sessionStorage.removeItem("vf_token");
-        sessionStorage.removeItem("vf_user");
-        setToken("");
+        // Network or offline: preserve session and username, do not kick out
         setSessionReady(true);
-        setNotice(en ? "Session expired. Sign in again." : "Сессия истекла. Войдите снова.");
       });
     return () => {
       active = false;
@@ -355,15 +604,34 @@ function App() {
       const response = await fetch(`${clean}/api/health`);
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error();
+      const prev = localStorage.getItem("vf_server");
       localStorage.setItem("vf_server", clean);
-      localStorage.removeItem("vf_token");
-      sessionStorage.removeItem("vf_token");
-      sessionStorage.removeItem("vf_user");
-      setToken("");
+      // Only clear auth when switching to a DIFFERENT server
+      if (prev !== clean) {
+        localStorage.removeItem("vf_token");
+        localStorage.removeItem("vf_user");
+        sessionStorage.removeItem("vf_token");
+        sessionStorage.removeItem("vf_user");
+        setToken("");
+        setUsername("");
+      }
       setServer(clean);
     } catch {
       setConnectError(true);
     }
+  }
+  function changeServer() {
+    void room?.disconnect();
+    resetCall();
+    localStorage.removeItem("vf_server");
+    localStorage.removeItem("vf_token");
+    localStorage.removeItem("vf_user");
+    sessionStorage.removeItem("vf_token");
+    sessionStorage.removeItem("vf_user");
+    setServer("");
+    setToken("");
+    setUsername("");
+    setChannels([]);
   }
   function resetCall() {
     setRoom(null);
@@ -385,19 +653,11 @@ function App() {
     setStreamSource("");
     setLocalStreamTrack(null);
     setSources([]);
+    if (noiseGateRef.current) {
+      noiseGateRef.current.stop();
+      noiseGateRef.current = null;
+    }
     if (mediaRef.current) mediaRef.current.innerHTML = "";
-  }
-  function changeServer() {
-    void room?.disconnect();
-    resetCall();
-    localStorage.removeItem("vf_server");
-    localStorage.removeItem("vf_token");
-    localStorage.removeItem("vf_user");
-    sessionStorage.removeItem("vf_token");
-    sessionStorage.removeItem("vf_user");
-    setServer("");
-    setToken("");
-    setChannels([]);
   }
   async function auth(
     mode: "login" | "register",
@@ -409,12 +669,14 @@ function App() {
       const response = await fetch(`${API()}/api/auth/${mode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: user, password, remember }),
+        body: JSON.stringify({ username: user, password, remember: mode === "register" ? true : remember }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Ошибка входа");
-      const storage = remember ? localStorage : sessionStorage;
-      const otherStorage = remember ? sessionStorage : localStorage;
+      // Registration always remembers; login uses the checkbox
+      const persist = mode === "register" ? true : remember;
+      const storage = persist ? localStorage : sessionStorage;
+      const otherStorage = persist ? sessionStorage : localStorage;
       otherStorage.removeItem("vf_token");
       otherStorage.removeItem("vf_user");
       storage.setItem("vf_token", data.token);
@@ -435,22 +697,145 @@ function App() {
     if (response.ok) setMessages(await response.json());
   }
   async function send() {
-    if (!text.trim() || !activeText) return;
+    if ((!text.trim() && !attachment) || !activeText) return;
     const body = text.trim();
+    const currentAttachment = attachment;
+    const currentReplyTo = replyTo;
     setText("");
+    setAttachment(null);
+    setReplyTo(null);
     try {
       const response = await fetch(
         `${API()}/api/channels/${activeText.id}/messages`,
-        { method: "POST", headers, body: JSON.stringify({ body }) },
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            body: body || (currentAttachment ? (en ? "Sent an attachment" : "Вложение") : ""),
+            reply_to: currentReplyTo ? { id: currentReplyTo.id, username: currentReplyTo.username, body: currentReplyTo.body } : null,
+            attachment: currentAttachment || null,
+          }),
+        },
       );
       if (!response.ok) throw new Error();
-      await loadMessages();
+      const newMsg = await response.json();
+      if (newMsg && newMsg.id) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === newMsg.id)) return prev;
+          return [...prev, newMsg];
+        });
+      }
       playSound("message");
     } catch {
       playSound("error");
       setText(body);
+      setAttachment(currentAttachment);
+      setReplyTo(currentReplyTo);
       setNotice(en ? "Could not send the message" : "Не удалось отправить сообщение");
     }
+  }
+
+  function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf("image") !== -1) {
+        const file = items[i].getAsFile();
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            if (typeof event.target?.result === "string") {
+              setAttachment(event.target.result);
+              playSound("click");
+            }
+          };
+          reader.readAsDataURL(file);
+          e.preventDefault();
+          break;
+        }
+      }
+    }
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setNotice(en ? "File is too large (max 5MB)" : "Файл слишком большой (максимум 5 МБ)");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (typeof event.target?.result === "string") {
+          setAttachment(event.target.result);
+          playSound("click");
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+    if (e.target) e.target.value = "";
+  }
+  function startVoiceActivityGate(roomInstance: Room, currentSettings: ClientSettings) {
+    if (noiseGateRef.current) {
+      noiseGateRef.current.stop();
+      noiseGateRef.current = null;
+    }
+    const micPub = roomInstance.localParticipant.getTrackPublication(Track.Source.Microphone);
+    const mediaStreamTrack = micPub?.track?.mediaStreamTrack;
+    if (!mediaStreamTrack) return;
+
+    try {
+      const audioCtx = new AudioContext();
+      const stream = new MediaStream([mediaStreamTrack]);
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 512;
+      source.connect(analyser);
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      let animationId = 0;
+      let speakingUntil = 0;
+      let isTrackEnabled = true;
+
+      const check = () => {
+        if (audioCtx.state === "suspended") void audioCtx.resume();
+        analyser.getByteTimeDomainData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          const val = (dataArray[i] - 128) / 128;
+          sum += val * val;
+        }
+        const rms = Math.sqrt(sum / dataArray.length);
+        const volume = Math.min(100, rms * 260 * (currentSettings.inputVolume / 100));
+        const threshold = currentSettings.autoThreshold ? 15 : currentSettings.voiceThreshold;
+
+        const isSpeakingNow = volume >= threshold;
+        const now = Date.now();
+        if (isSpeakingNow) {
+          speakingUntil = now + 350;
+          if (!isTrackEnabled && !deafenedRef.current) {
+            isTrackEnabled = true;
+            mediaStreamTrack.enabled = true;
+          }
+        } else if (now > speakingUntil) {
+          if (isTrackEnabled) {
+            isTrackEnabled = false;
+            mediaStreamTrack.enabled = false;
+          }
+        }
+
+        animationId = requestAnimationFrame(check);
+      };
+      check();
+
+      noiseGateRef.current = {
+        stop: () => {
+          cancelAnimationFrame(animationId);
+          void audioCtx.close();
+          if (mediaStreamTrack) mediaStreamTrack.enabled = true;
+        },
+      };
+    } catch {}
   }
   async function joinVoice(name: string) {
     if (joiningRef.current) return;
@@ -574,6 +959,7 @@ function App() {
         });
         setMuted(false);
         refresh();
+        startVoiceActivityGate(next, settings);
       } catch (microphoneError) {
         setMuted(true);
         refresh();
@@ -838,6 +1224,7 @@ function App() {
           ...({ volume: next.inputVolume / 100 } as any),
         });
         setMuted(false);
+        startVoiceActivityGate(room, next);
       } catch {
         setNotice(
           en ? "Some device settings will apply the next time you join a channel" : "Часть настроек устройства применится при следующем входе в канал",
@@ -869,7 +1256,7 @@ function App() {
         <span>{en ? "Restoring session…" : "Восстанавливаем сессию…"}</span>
       </div>
     );
-  if (desktop && !server)
+  if (!server)
     return (
       <>
         <ServerSetup onConnect={connectServer} error={connectError} language={settings.language} onLanguage={changeLanguage} />
@@ -884,7 +1271,7 @@ function App() {
           server={server}
           language={settings.language}
           onLanguage={changeLanguage}
-          onChangeServer={desktop ? changeServer : undefined}
+          onChangeServer={changeServer}
         />
         <Toast text={notice} />
       </>
@@ -911,87 +1298,175 @@ function App() {
             <small>SERVER</small>
             <b>{server.replace(/^https?:\/\//, "") || "VoiceForge"}</b>
           </div>
-          {desktop && (
-            <button onClick={changeServer} title="Сменить сервер">
-              ⌁
-            </button>
-          )}
+          <button onClick={changeServer} title={en ? "Change server" : "Сменить сервер"}>
+            ⌁
+          </button>
         </div>
-        <Section title={en ? "TEXT CHANNELS" : "ТЕКСТОВЫЕ"} />
-        {channels
-          .filter((channel) => channel.type === "text")
-          .map((channel) => (
-            <button
-              className={
-                "channel " + (activeText?.id === channel.id ? "active" : "")
-              }
-              onClick={() => setActiveText(channel)}
-              key={channel.id}
-            >
-              <i>#</i>
-              {channel.name}
-            </button>
-          ))}
-        <Section title={en ? "VOICE CHANNELS" : "ГОЛОСОВЫЕ"} />
-        {channels
-          .filter((channel) => channel.type === "voice")
-          .map((channel) => (
-            <React.Fragment key={channel.id}>
+        <div className="sidebarScrollArea">
+          <div
+            className="discordCategoryHead"
+            onClick={() => setCollapsedCategories((prev) => ({ ...prev, text: !prev.text }))}
+          >
+            <span className={`discordChevron ${collapsedCategories.text ? "collapsed" : ""}`}>▼</span>
+            <span>{en ? "TEXT CHANNELS" : "ТЕКСТОВЫЕ КАНАЛЫ"}</span>
+            <span className="categoryCount">{channels.filter((c) => c.type === "text").length}</span>
+          </div>
+          {!collapsedCategories.text && channels
+            .filter((channel) => channel.type === "text")
+            .map((channel) => (
               <button
                 className={
-                  "channel " + (voice === channel.name ? "active" : "")
+                  "discordChannelBtn " + (activeText?.id === channel.id ? "active" : "")
                 }
-                onClick={() => void joinVoice(channel.name)}
-                disabled={callStatus === "connecting"}
+                onClick={() => setActiveText(channel)}
+                key={channel.id}
               >
-                <i>◖</i>
-                {channel.name}
-                {voice === channel.name && <span className="signal">▮▮▮</span>}
+                <i className="chanIcon">#</i>
+                <span className="chanName">{channel.name}</span>
               </button>
-              {voice === channel.name &&
-                participants.map((participant) => (
-                  <div
-                    className={`voiceUser ${remoteStreams.some((stream) => stream.name === participant && stream.video) || (participant === username && streamStatus === "live") ? "isStreaming" : ""}`}
-                    key={participant}
-                  >
-                    <Avatar name={participant} small />
-                    <span>{participant}</span>
-                    {participant === username && streamStatus === "live" && (
-                      <span className="userLiveBadge own"><i />{en ? "LIVE" : "ЭФИР"}</span>
-                    )}
-                    {remoteStreams.filter((stream) => stream.name === participant && stream.video).map((stream) => (
-                      <button
-                        className={`userLiveBadge ${stream.watching ? "watching" : ""}`}
-                        key={stream.id}
-                        onClick={() => toggleRemoteStream(stream.id)}
-                        title={en ? `Watch ${participant}'s stream` : `Смотреть трансляцию ${participant}`}
-                      >
-                        <i />{stream.watching ? (en ? "WATCHING" : "СМОТРИМ") : (en ? "LIVE" : "ЭФИР")}
-                      </button>
-                    ))}
-                    <span
-                      className={`sidebarMic ${participantStates[participant]?.mic ? "on" : "off"}`}
-                      title={participantStates[participant]?.mic ? (en ? "Microphone on" : "Микрофон включён") : (en ? "Microphone off" : "Микрофон выключен")}
-                    >
-                      {participantStates[participant]?.mic ? "🎙" : "🔇"}
-                    </span>
-                  </div>
-                ))}
-            </React.Fragment>
-          ))}
-        <div className="profile">
-          <Avatar name={username} />
-          <div>
-            <b>{username}</b>
-            <small>{voice ? (en ? `In ${voice}` : `В ${voice}`) : en ? "Online" : "В сети"}</small>
-          </div>
-          <button
-            className="logoutButton"
-            onClick={logout}
-            title="Выйти из аккаунта"
+            ))}
+
+          <div
+            className="discordCategoryHead"
+            onClick={() => setCollapsedCategories((prev) => ({ ...prev, voice: !prev.voice }))}
           >
-            ↪
-          </button>
+            <span className={`discordChevron ${collapsedCategories.voice ? "collapsed" : ""}`}>▼</span>
+            <span>{en ? "VOICE CHANNELS" : "ГОЛОСОВЫЕ КАНАЛЫ"}</span>
+            <span className="categoryCount">{channels.filter((c) => c.type === "voice").length}</span>
+          </div>
+          {!collapsedCategories.voice && channels
+            .filter((channel) => channel.type === "voice")
+            .map((channel) => (
+              <React.Fragment key={channel.id}>
+                <button
+                  className={
+                    "discordChannelBtn voiceChan " + (voice === channel.name ? "connected" : "")
+                  }
+                  onClick={() => void joinVoice(channel.name)}
+                  disabled={callStatus === "connecting"}
+                >
+                  <i className="chanIcon">🔊</i>
+                  <span className="chanName">{channel.name}</span>
+                  {voice === channel.name && (
+                    <span className="voiceSignalPill">
+                      <span className="voiceSignalBar" />
+                      <span className="voiceSignalBar" />
+                      <span className="voiceSignalBar" />
+                    </span>
+                  )}
+                </button>
+                {voice === channel.name && (
+                  <div className="discordChannelUsers">
+                    {participants.map((participant) => (
+                      <div
+                        className={`discordChannelUserRow ${participantStates[participant]?.speaking ? "speaking" : ""} ${remoteStreams.some((stream) => stream.name === participant && stream.video) || (participant === username && streamStatus === "live") ? "isStreaming" : ""}`}
+                        key={participant}
+                      >
+                        <div className="userAvatarWrap">
+                          <Avatar name={participant} small />
+                        </div>
+                        <span className="userNameText">{participant}</span>
+                        {participant === username && streamStatus === "live" && (
+                          <span className="userLiveBadge own"><i />{en ? "LIVE" : "ЭФИР"}</span>
+                        )}
+                        {remoteStreams.filter((stream) => stream.name === participant && stream.video).map((stream) => (
+                          <button
+                            className={`userLiveBadge ${stream.watching ? "watching" : ""}`}
+                            key={stream.id}
+                            onClick={() => toggleRemoteStream(stream.id)}
+                            title={en ? `Watch ${participant}'s stream` : `Смотреть трансляцию ${participant}`}
+                          >
+                            <i />{stream.watching ? (en ? "WATCHING" : "СМОТРИМ") : (en ? "LIVE" : "ЭФИР")}
+                          </button>
+                        ))}
+                        <span
+                          className={`sidebarMic ${participantStates[participant]?.mic ? "on" : "off"}`}
+                          title={participantStates[participant]?.mic ? (en ? "Microphone on" : "Микрофон включён") : (en ? "Microphone off" : "Микрофон выключен")}
+                        >
+                          {participantStates[participant]?.mic ? "🎙" : "🔇"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </React.Fragment>
+            ))}
+        </div>
+
+        {voice && (
+          <div className="discordVoiceStatusBar">
+            <div className="voiceStatusLeft">
+              <span className={`voiceStatusSignal ${callStatus}`}>
+                <i /><i /><i />
+              </span>
+              <div>
+                <b className="voiceStatusTitle">
+                  {callStatus === "connected"
+                    ? en ? "Voice Connected" : "Голос подключён"
+                    : callStatus === "connecting"
+                      ? en ? "Connecting…" : "Подключение…"
+                      : en ? "Reconnecting…" : "Восстановление…"}
+                </b>
+                <span className="voiceStatusChannel">
+                  {voice} {ping !== null && <small className="pingValue">/ {ping}ms</small>}
+                </span>
+              </div>
+            </div>
+            <button
+              className="voiceDisconnectBtn"
+              onClick={() => void leaveVoice()}
+              title={en ? "Disconnect" : "Отключиться"}
+            >
+              📞✕
+            </button>
+          </div>
+        )}
+
+        <div className="discordUserPanel">
+          <div
+            className="discordUserInfo"
+            onClick={() => setSettingsOpen(true)}
+            title={en ? "Open Settings" : "Открыть настройки"}
+          >
+            <div className="discordAvatarWithStatus">
+              <Avatar name={username} />
+              <span className="onlineIndicator" />
+            </div>
+            <div className="discordUserText">
+              <b className="discordUsername">{username}</b>
+              <small className="discordSubtext">{en ? "Online" : "В сети"}</small>
+            </div>
+          </div>
+          <div className="discordUserControls">
+            <button
+              className={`userControlBtn ${muted ? "active" : ""}`}
+              onClick={() => void toggleMute()}
+              title={muted ? (en ? "Unmute Microphone" : "Включить микрофон") : (en ? "Mute Microphone" : "Заглушить микрофон")}
+            >
+              {muted ? "🔇" : "🎙"}
+            </button>
+            <button
+              className={`userControlBtn ${deafened ? "active" : ""}`}
+              onClick={() => void toggleDeafen()}
+              title={deafened ? (en ? "Undeafen" : "Включить звук") : (en ? "Deafen" : "Заглушить звук")}
+            >
+              {deafened ? "🔇" : "🎧"}
+            </button>
+            <button
+              className={`userControlBtn ${settingsOpen ? "active" : ""}`}
+              onClick={() => setSettingsOpen(true)}
+              title={en ? "User Settings" : "Настройки"}
+            >
+              ⚙
+            </button>
+            <button
+              className="userControlBtn logout"
+              onClick={logout}
+              title={en ? "Log Out" : "Выйти из аккаунта"}
+            >
+              ↪
+            </button>
+          </div>
         </div>
       </aside>
       <main className="content">
@@ -1004,6 +1479,12 @@ function App() {
             </div>
           </div>
           <div className="headerBtns">
+            {ping !== null && (
+              <div className="headerPingBadge" title={`Ping: ${ping} ms`}>
+                <span className={`pingDot ${ping < 60 ? "good" : ping < 150 ? "medium" : "bad"}`} />
+                <span>{ping} ms</span>
+              </div>
+            )}
             <button
               className={searchOpen ? "active" : ""}
               title="Поиск по сообщениям"
@@ -1228,41 +1709,156 @@ function App() {
                     .includes(searchQuery.toLowerCase()),
               )
               .map((message) => (
-                <div className="message" key={message.id}>
-                  <Avatar name={message.username} />
-                  <div>
-                    <div className="meta">
-                      <b>{message.username}</b>
-                      <small>
-                        {new Date(message.created_at).toLocaleString()}
-                      </small>
+                <div className="message discordMessageRow" key={message.id}>
+                  {message.reply_to && (
+                    <div className="discordReplyContext">
+                      <span className="discordReplySpine" />
+                      <span className="discordReplyUser">@{message.reply_to.username}</span>
+                      <span className="discordReplyText">{message.reply_to.body}</span>
                     </div>
-                    <p>{message.body}</p>
+                  )}
+                  <div className="discordMessageContent">
+                    <Avatar name={message.username} />
+                    <div className="discordMessageBody">
+                      <div className="meta">
+                        <b>{message.username}</b>
+                        <small>
+                          {new Date(message.created_at).toLocaleString()}
+                        </small>
+                      </div>
+                      <MarkdownMessage content={message.body} />
+                      {message.attachment && (
+                        <div className="discordAttachmentWrapper">
+                          <img
+                            src={message.attachment}
+                            alt="Attachment"
+                            className="discordAttachmentImg"
+                            onClick={() => window.open(message.attachment!, "_blank")}
+                            title={en ? "Click to view full size" : "Нажмите для просмотра"}
+                          />
+                        </div>
+                      )}
+                      {message.reactions && Object.keys(message.reactions).length > 0 && (
+                        <div className="discordReactionsRow">
+                          {Object.entries(message.reactions).map(([emoji, users]) => {
+                            const hasReacted = users.includes(username);
+                            return (
+                              <button
+                                key={emoji}
+                                className={`discordReactionPill ${hasReacted ? "active" : ""}`}
+                                onClick={() => toggleReaction(message.id, emoji)}
+                                title={users.join(", ")}
+                              >
+                                <span>{emoji}</span>
+                                <span className="reactionCount">{users.length}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <div className="discordMessageActions">
+                      <button onClick={() => toggleReaction(message.id, "👍")} title="👍">👍</button>
+                      <button onClick={() => toggleReaction(message.id, "❤️")} title="❤️">❤️</button>
+                      <button onClick={() => toggleReaction(message.id, "🔥")} title="🔥">🔥</button>
+                      <button onClick={() => toggleReaction(message.id, "😂")} title="😂">😂</button>
+                      <button onClick={() => setReplyTo(message)} title={en ? "Reply" : "Ответить"}>💬</button>
+                    </div>
                   </div>
                 </div>
               ))}
           </div>
-          <div className="composer">
+          <div className="discordComposerContainer">
+            {replyTo && (
+              <div className="discordReplyBar">
+                <div className="discordReplyBarText">
+                  <span>{en ? "Replying to" : "Ответ для"} <b>@{replyTo.username}</b></span>
+                  <small>{replyTo.body.slice(0, 80)}{replyTo.body.length > 80 ? "…" : ""}</small>
+                </div>
+                <button
+                  className="discordReplyCancel"
+                  onClick={() => setReplyTo(null)}
+                  title={en ? "Cancel reply" : "Отменить ответ"}
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+            {attachment && (
+              <div className="discordAttachmentPreviewBar">
+                <img src={attachment} alt="Attachment preview" />
+                <span>{en ? "Attached image" : "Прикреплённое изображение"}</span>
+                <button
+                  className="discordAttachmentRemove"
+                  onClick={() => setAttachment(null)}
+                  title={en ? "Remove attachment" : "Удалить вложение"}
+                >
+                  ✕
+                </button>
+              </div>
+            )}
             <input
-              value={text}
-              maxLength={2000}
-              onChange={(event) => setText(event.target.value)}
-              onKeyDown={(event) =>
-                event.key === "Enter" && !event.shiftKey && void send()
-              }
-              placeholder={`${en ? "Message" : "Сообщение в"} #${activeText?.name || "general"}`}
+              type="file"
+              ref={fileInputRef}
+              style={{ display: "none" }}
+              accept="image/*"
+              onChange={handleFileSelect}
             />
-            <span className="charCount">
-              {text.length ? `${text.length}/2000` : ""}
-            </span>
-            <button
-              className="send"
-              onClick={() => void send()}
-              disabled={!text.trim()}
-              title="Отправить"
-            >
-              ➤
-            </button>
+            <div className="composer">
+              <button
+                type="button"
+                className="discordAttachBtn"
+                onClick={() => fileInputRef.current?.click()}
+                title={en ? "Attach image or screenshot" : "Прикрепить изображение или скриншот"}
+              >
+                +
+              </button>
+              <input
+                value={text}
+                maxLength={2000}
+                onChange={(event) => setText(event.target.value)}
+                onPaste={handlePaste}
+                onKeyDown={(event) =>
+                  event.key === "Enter" && !event.shiftKey && void send()
+                }
+                placeholder={`${en ? "Message" : "Сообщение в"} #${activeText?.name || "general"}`}
+              />
+              <span className="charCount">
+                {text.length ? `${text.length}/2000` : ""}
+              </span>
+              <button
+                type="button"
+                className={`discordEmojiBtn ${emojiPickerOpen ? "active" : ""}`}
+                onClick={() => setEmojiPickerOpen(!emojiPickerOpen)}
+                title="Emoji"
+              >
+                😀
+              </button>
+              <button
+                className="send"
+                onClick={() => void send()}
+                disabled={!text.trim() && !attachment}
+                title="Отправить"
+              >
+                ➤
+              </button>
+              {emojiPickerOpen && (
+                <div className="discordQuickEmojiPicker">
+                  {["😀", "😂", "😍", "🔥", "👍", "🎉", "🚀", "✨", "❤️", "😎", "👀", "💯", "👋", "🤔", "🙌", "💀"].map((em) => (
+                    <button
+                      key={em}
+                      type="button"
+                      onClick={() => {
+                        setText((prev) => prev + em);
+                        setEmojiPickerOpen(false);
+                      }}
+                    >
+                      {em}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </section>
       </main>
@@ -1439,10 +2035,13 @@ function SettingsModal({
   const [draft, setDraft] = useState(value),
     [devices, setDevices] = useState<MediaDeviceInfo[]>([]),
     [testing, setTesting] = useState(false),
+    [loopback, setLoopback] = useState(false),
     [level, setLevel] = useState(0),
     [deviceError, setDeviceError] = useState("");
   const en = draft.language === "en";
   const streamRef = useRef<MediaStream | null>(null),
+    loopbackGainRef = useRef<GainNode | null>(null),
+    audioCtxRef = useRef<AudioContext | null>(null),
     frameRef = useRef(0);
   const list = async (requestPermission = false) => {
     try {
@@ -1480,6 +2079,13 @@ function SettingsModal({
           `${kind === "audioinput" ? (en ? "Microphone" : "Микрофон") : kind === "audiooutput" ? (en ? "Speakers" : "Динамики") : en ? "Camera" : "Камера"} ${index + 1}`,
       })),
   ];
+  function toggleLoopback() {
+    const next = !loopback;
+    setLoopback(next);
+    if (loopbackGainRef.current && audioCtxRef.current) {
+      loopbackGainRef.current.gain.setValueAtTime(next ? 1 : 0, audioCtxRef.current.currentTime);
+    }
+  }
   async function startTest() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -1492,25 +2098,45 @@ function SettingsModal({
         video: false,
       });
       streamRef.current = stream;
-      const context = new AudioContext(),
-        source = context.createMediaStreamSource(stream),
-        analyser = context.createAnalyser(),
-        data = new Uint8Array(analyser.fftSize);
+      const context = new AudioContext();
+      audioCtxRef.current = context;
+      const source = context.createMediaStreamSource(stream);
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 512;
+      const loopbackGain = context.createGain();
+      loopbackGain.gain.value = loopback ? 1 : 0;
+      loopbackGainRef.current = loopbackGain;
+
       source.connect(analyser);
+      source.connect(loopbackGain);
+      loopbackGain.connect(context.destination);
+
+      const data = new Uint8Array(analyser.frequencyBinCount);
       setTesting(true);
       const tick = () => {
+        if (context.state === "suspended") void context.resume();
         analyser.getByteTimeDomainData(data);
         let sum = 0;
         for (const sample of data) {
           const normalized = (sample - 128) / 128;
           sum += normalized * normalized;
         }
-        setLevel(
-          Math.min(
-            100,
-            Math.sqrt(sum / data.length) * 240 * (draft.inputVolume / 100),
-          ),
+        const rms = Math.sqrt(sum / data.length);
+        const currentLevel = Math.min(
+          100,
+          rms * 260 * (draft.inputVolume / 100),
         );
+        setLevel(currentLevel);
+
+        const threshold = draft.autoThreshold ? 15 : draft.voiceThreshold;
+        if (loopbackGainRef.current) {
+          if (loopback && currentLevel >= threshold) {
+            loopbackGainRef.current.gain.setValueAtTime(1, context.currentTime);
+          } else {
+            loopbackGainRef.current.gain.setValueAtTime(0, context.currentTime);
+          }
+        }
+
         frameRef.current = requestAnimationFrame(tick);
       };
       tick();
@@ -1522,6 +2148,10 @@ function SettingsModal({
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     cancelAnimationFrame(frameRef.current);
+    if (audioCtxRef.current) {
+      void audioCtxRef.current.close();
+      audioCtxRef.current = null;
+    }
     setTesting(false);
     setLevel(0);
   }
@@ -1599,15 +2229,17 @@ function SettingsModal({
               {deviceError && <p className="settingsError">{deviceError}</p>}
             </section>
             <section className="settingsSection">
-              <h3>{en ? "Volume" : "Громкость"}</h3>
+              <h3>{en ? "Volume & Microphone" : "Громкость и микрофон"}</h3>
               <SettingRange
-                label={en ? "Microphone gain" : "Усиление микрофона"}
+                label={en ? "Microphone volume" : "Громкость микрофона"}
                 value={draft.inputVolume}
+                max={200}
                 onChange={(next) => update("inputVolume", next)}
               />
               <SettingRange
                 label={en ? "People volume" : "Громкость собеседников"}
                 value={draft.outputVolume}
+                max={200}
                 onChange={(next) => update("outputVolume", next)}
               />
               <SettingRange
@@ -1615,19 +2247,70 @@ function SettingsModal({
                 value={draft.interfaceVolume}
                 onChange={(next) => update("interfaceVolume", next)}
               />
-              <div className="micTest">
-                <div>
-                  <b>{en ? "Microphone test" : "Тест микрофона"}</b>
-                  <small>{en ? "Say a few words and check the level" : "Скажите несколько слов и проверьте уровень"}</small>
+              <div className="micTest discordMicBox">
+                <div className="micTestHeader">
+                  <div>
+                    <b>{en ? "Input Sensitivity & Noise Gate" : "Активация по голосу и шумоподавление"}</b>
+                    <small>{en ? "Voice is transmitted only when volume exceeds the threshold (background noise is cut off)" : "Голос передается только при уровне выше порога (фон и дыхание отсекаются)"}</small>
+                  </div>
+                  <label className="autoThresholdToggle">
+                    <input
+                      type="checkbox"
+                      checked={draft.autoThreshold}
+                      onChange={(e) => update("autoThreshold", e.target.checked)}
+                    />
+                    <span>{en ? "Auto sensitivity" : "Автоматический порог"}</span>
+                  </label>
                 </div>
-                <div className="levelTrack">
-                  <i style={{ width: `${level}%` }} />
+
+                {!draft.autoThreshold && (
+                  <div className="thresholdControl">
+                    <span>{en ? "Sensitivity threshold" : "Порог срабатывания"}: <b>{draft.voiceThreshold}%</b></span>
+                    <input
+                      type="range"
+                      min={2}
+                      max={85}
+                      value={draft.voiceThreshold}
+                      onChange={(e) => update("voiceThreshold", Number(e.target.value))}
+                      className="thresholdSlider"
+                    />
+                  </div>
+                )}
+
+                <div className="meterTrackWrapper">
+                  <div className="meterTrack">
+                    <i
+                      className={level >= (draft.autoThreshold ? 15 : draft.voiceThreshold) ? "speakingActive" : "noiseCutoff"}
+                      style={{ width: `${level}%` }}
+                    />
+                    <div
+                      className="thresholdMarker"
+                      style={{ left: `${draft.autoThreshold ? 15 : draft.voiceThreshold}%` }}
+                      title={`${en ? "Threshold" : "Порог"}: ${draft.autoThreshold ? 15 : draft.voiceThreshold}%`}
+                    />
+                  </div>
+                  <div className="meterLegend">
+                    <span className="noiseLegend">{en ? "◄ Background noise (Muted)" : "◄ Фоновый шум (Глушится)"}</span>
+                    <span className="voiceLegend">{en ? "Voice (Transmitted) ►" : "Голос (В эфире) ►"}</span>
+                  </div>
                 </div>
-                <button
-                  onClick={() => (testing ? stopTest() : void startTest())}
-                >
-                  {testing ? (en ? "Stop" : "Остановить") : en ? "Start test" : "Начать тест"}
-                </button>
+
+                <div className="testActionButtons">
+                  <button
+                    className={`testMainBtn ${testing ? "activeTest" : ""}`}
+                    onClick={() => (testing ? stopTest() : void startTest())}
+                  >
+                    {testing ? (en ? "■ Stop Test" : "■ Остановить тест") : (en ? "▶ Let's Check" : "▶ Проверить микрофон")}
+                  </button>
+                  {testing && (
+                    <button
+                      className={`loopbackBtn ${loopback ? "loopbackOn" : ""}`}
+                      onClick={toggleLoopback}
+                    >
+                      {loopback ? (en ? "🎧 Hear self: ON" : "🎧 Слышу себя: ВКЛ") : (en ? "🎧 Hear self (Off)" : "🎧 Слушать себя")}
+                    </button>
+                  )}
+                </div>
               </div>
             </section>
             <section className="settingsSection">
@@ -1727,10 +2410,14 @@ function SettingSelect({
 function SettingRange({
   label,
   value,
+  max = 100,
+  min = 0,
   onChange,
 }: {
   label: string;
   value: number;
+  max?: number;
+  min?: number;
   onChange: (value: number) => void;
 }) {
   return (
@@ -1741,8 +2428,8 @@ function SettingRange({
       </span>
       <input
         type="range"
-        min="0"
-        max="100"
+        min={min}
+        max={max}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
       />

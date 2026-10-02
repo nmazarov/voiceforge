@@ -8,3 +8,4 @@ client/release/
 *.db-wal
 server/backups/
 .DS_Store
+*.tsbuildinfo
