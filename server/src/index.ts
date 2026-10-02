@@ -73,8 +73,8 @@ app.post('/api/admin/key-login',async(req,reply)=>{const {key}=z.object({key:z.s
 app.get('/api/admin/overview',async(req,reply)=>{const u=requireRole(req,reply,['admin','owner']);if(!u)return;return{users:(db.prepare('SELECT COUNT(*) c FROM users').get() as any).c,admins:(db.prepare(`SELECT COUNT(*) c FROM users WHERE role IN ('admin','owner')`).get() as any).c,blocked:(db.prepare('SELECT COUNT(*) c FROM users WHERE disabled=1').get() as any).c,channels:(db.prepare('SELECT COUNT(*) c FROM channels').get() as any).c,messages:(db.prepare('SELECT COUNT(*) c FROM messages').get() as any).c}});
 app.get('/api/admin/users',async(req,reply)=>{const u=requireRole(req,reply,['admin','owner']);if(!u)return;return db.prepare(`SELECT id,username,role,disabled,created_at FROM users ORDER BY id`).all()});
 app.patch('/api/admin/users/:id',async(req:any,reply)=>{const actor=requireRole(req,reply,['admin','owner']);if(!actor)return;const id=Number(req.params.id);const body=z.object({role:z.enum(['user','admin']).optional(),disabled:z.boolean().optional()}).parse(req.body);const target=db.prepare('SELECT role FROM users WHERE id=?').get(id) as any;if(!target)return reply.code(404).send({error:'User not found'});if(target.role==='owner')return reply.code(403).send({error:'Owner cannot be modified'});if(body.role!==undefined&&actor.role!=='owner')return reply.code(403).send({error:'Only owner can change roles'});if(body.role!==undefined)db.prepare('UPDATE users SET role=? WHERE id=?').run(body.role,id);if(body.disabled!==undefined)db.prepare('UPDATE users SET disabled=? WHERE id=?').run(body.disabled?1:0,id);audit(actor.id,'update_user','user',String(id),body);return{ok:true}});
-app.post('/api/admin/channels',async(req,reply)=>{const actor=requireRole(req,reply,['admin','owner']);if(!actor)return;const b=z.object({name:z.string().min(1).max(64),type:z.enum(['text','voice'])}).parse(req.body);const info=db.prepare('INSERT INTO channels(name,type) VALUES (?,?)').run(b.name,b.type);audit(actor.id,'create_channel','channel',String(info.lastInsertRowid),b);return{id:Number(info.lastInsertRowid),...b}});
-app.delete('/api/admin/channels/:id',async(req:any,reply)=>{const actor=requireRole(req,reply,['admin','owner']);if(!actor)return;const id=Number(req.params.id);db.prepare('DELETE FROM channels WHERE id=?').run(id);audit(actor.id,'delete_channel','channel',String(id));return{ok:true}});
+app.post('/api/admin/channels',async(req,reply)=>{const actor=requireRole(req,reply,['admin','owner']);if(!actor)return;const b=z.object({name:z.string().min(1).max(64),type:z.enum(['text','voice'])}).parse(req.body);const cleanName=b.type==='text'?b.name.toLowerCase().trim().replace(/[\s_]+/g,'-'):b.name.trim();const info=db.prepare('INSERT INTO channels(name,type) VALUES (?,?)').run(cleanName,b.type);const ch={id:Number(info.lastInsertRowid),name:cleanName,type:b.type};audit(actor.id,'create_channel','channel',String(info.lastInsertRowid),b);broadcast('channel:created',ch);return ch;});
+app.delete('/api/admin/channels/:id',async(req:any,reply)=>{const actor=requireRole(req,reply,['admin','owner']);if(!actor)return;const id=Number(req.params.id);db.prepare('DELETE FROM channels WHERE id=?').run(id);try{db.prepare('DELETE FROM messages WHERE channel_id=?').run(id);}catch{}audit(actor.id,'delete_channel','channel',String(id));broadcast('channel:deleted',{id});return{ok:true}});
 app.get('/api/admin/audit',async(req,reply)=>{const actor=requireRole(req,reply,['owner']);if(!actor)return;return db.prepare(`SELECT a.*,u.username actor_username FROM audit_log a LEFT JOIN users u ON u.id=a.actor_user_id ORDER BY a.id DESC LIMIT 250`).all()});
 const wsClients = new Set<any>();
 function broadcast(event: string, payload: any) {
@@ -121,6 +121,31 @@ app.get('/api/ws', { websocket: true }, (connection, req) => {
   });
 });
 app.get('/api/channels',async()=>db.prepare('SELECT id,name,type FROM channels ORDER BY type,id').all());
+app.post('/api/channels',async(req:any,reply)=>{
+  const u=auth(req);
+  if(!u)return reply.code(401).send({error:'Unauthorized'});
+  const b=z.object({name:z.string().min(1).max(64),type:z.enum(['text','voice'])}).parse(req.body);
+  const cleanName=b.type==='text'?b.name.toLowerCase().trim().replace(/[\s_]+/g,'-'):b.name.trim();
+  const info=db.prepare('INSERT INTO channels(name,type) VALUES (?,?)').run(cleanName,b.type);
+  const ch={id:Number(info.lastInsertRowid),name:cleanName,type:b.type};
+  audit(u.id,'create_channel','channel',String(ch.id),ch);
+  broadcast('channel:created',ch);
+  return ch;
+});
+app.delete('/api/channels/:id',async(req:any,reply)=>{
+  const u=auth(req);
+  if(!u)return reply.code(401).send({error:'Unauthorized'});
+  const id=Number(req.params.id);
+  const chan=db.prepare('SELECT * FROM channels WHERE id=?').get(id) as any;
+  if(!chan)return reply.code(404).send({error:'Channel not found'});
+  const count=(db.prepare('SELECT COUNT(*) as c FROM channels WHERE type=?').get(chan.type) as any).c;
+  if(count<=1)return reply.code(400).send({error:'Cannot delete the only channel of this type'});
+  db.prepare('DELETE FROM channels WHERE id=?').run(id);
+  try{db.prepare('DELETE FROM messages WHERE channel_id=?').run(id);}catch{}
+  audit(u.id,'delete_channel','channel',String(id));
+  broadcast('channel:deleted',{id,name:chan.name,type:chan.type});
+  return{ok:true,id};
+});
 app.get('/api/channels/:id/messages',async(req:any,reply)=>{
   const u=auth(req);
   if(!u)return reply.code(401).send({error:'Unauthorized'});

@@ -411,7 +411,11 @@ function App() {
     [volumeMenuUser, setVolumeMenuUser] = useState<string | null>(null),
     [editingMessageId, setEditingMessageId] = useState<number | null>(null),
     [editingText, setEditingText] = useState(""),
-    [typingUsers, setTypingUsers] = useState<Record<string, number>>({});
+    [typingUsers, setTypingUsers] = useState<Record<string, number>>({}),
+    [createChannelOpen, setCreateChannelOpen] = useState(false),
+    [createChannelType, setCreateChannelType] = useState<"text" | "voice">("text"),
+    [newChannelName, setNewChannelName] = useState(""),
+    [createChannelLoading, setCreateChannelLoading] = useState(false);
   const en = settings.language === "en";
   const mediaRef = useRef<HTMLDivElement>(null),
     deafenedRef = useRef(false),
@@ -532,6 +536,26 @@ function App() {
                   return { ...m, reactions: currentReactions };
                 })
               );
+            } else if (data.event === "channel:created") {
+              const newChan = data.payload as Channel;
+              if (newChan) {
+                setChannels((prev) => {
+                  if (prev.some((c) => c.id === newChan.id)) return prev;
+                  return [...prev, newChan];
+                });
+              }
+            } else if (data.event === "channel:deleted") {
+              const { id } = data.payload || {};
+              if (id) {
+                setChannels((prev) => {
+                  const updated = prev.filter((c) => c.id !== id);
+                  if (activeTextRef.current?.id === id) {
+                    const nextText = updated.find((c) => c.type === "text") || null;
+                    setActiveText(nextText);
+                  }
+                  return updated;
+                });
+              }
             }
           } catch {}
         };
@@ -631,6 +655,76 @@ function App() {
       }
     } catch (err) {
       console.error("Failed to delete message:", err);
+    }
+  }
+
+  async function createChannel(name: string, type: "text" | "voice") {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setCreateChannelLoading(true);
+    try {
+      const res = await fetch(`${server}/api/channels`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ name: trimmed, type }),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setChannels((prev) => {
+          if (prev.some((c) => c.id === created.id)) return prev;
+          return [...prev, created];
+        });
+        if (created.type === "text") {
+          setActiveText(created);
+        }
+        setCreateChannelOpen(false);
+        setNewChannelName("");
+        playSound("click");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || (en ? "Failed to create channel" : "Не удалось создать канал"));
+      }
+    } catch (err) {
+      console.error("Failed to create channel:", err);
+    } finally {
+      setCreateChannelLoading(false);
+    }
+  }
+
+  async function deleteChannel(channelId: number, channelName: string) {
+    if (
+      !window.confirm(
+        en
+          ? `Are you sure you want to delete channel "${channelName}"? All messages in it will be permanently deleted.`
+          : `Вы уверены, что хотите удалить канал "${channelName}"? Все сообщения в нём будут безвозвратно удалены.`
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch(`${server}/api/channels/${channelId}`, {
+        method: "DELETE",
+        headers,
+      });
+      if (res.ok) {
+        setChannels((prev) => {
+          const updated = prev.filter((c) => c.id !== channelId);
+          if (activeText?.id === channelId) {
+            const nextText = updated.find((c) => c.type === "text") || null;
+            setActiveText(nextText);
+          }
+          return updated;
+        });
+        if (voice === channelName) {
+          void leaveVoice();
+        }
+        playSound("click");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || (en ? "Failed to delete channel" : "Не удалось удалить канал"));
+      }
+    } catch (err) {
+      console.error("Failed to delete channel:", err);
     }
   }
   useEffect(() => {
@@ -1430,20 +1524,44 @@ function App() {
             <span className={`discordChevron ${collapsedCategories.text ? "collapsed" : ""}`}>▼</span>
             <span>{en ? "TEXT CHANNELS" : "ТЕКСТОВЫЕ КАНАЛЫ"}</span>
             <span className="categoryCount">{channels.filter((c) => c.type === "text").length}</span>
+            <button
+              type="button"
+              className="discordCategoryAddBtn"
+              onClick={(e) => {
+                e.stopPropagation();
+                setCreateChannelType("text");
+                setCreateChannelOpen(true);
+              }}
+              title={en ? "Create Text Channel" : "Создать текстовый канал"}
+            >
+              +
+            </button>
           </div>
           {!collapsedCategories.text && channels
             .filter((channel) => channel.type === "text")
             .map((channel) => (
-              <button
-                className={
-                  "discordChannelBtn " + (activeText?.id === channel.id ? "active" : "")
-                }
-                onClick={() => setActiveText(channel)}
-                key={channel.id}
-              >
-                <i className="chanIcon">#</i>
-                <span className="chanName">{channel.name}</span>
-              </button>
+              <div className="discordChannelRow" key={channel.id}>
+                <button
+                  className={
+                    "discordChannelBtn " + (activeText?.id === channel.id ? "active" : "")
+                  }
+                  onClick={() => setActiveText(channel)}
+                >
+                  <i className="chanIcon">#</i>
+                  <span className="chanName">{channel.name}</span>
+                </button>
+                <button
+                  type="button"
+                  className="discordChanDeleteBtn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void deleteChannel(channel.id, channel.name);
+                  }}
+                  title={en ? `Delete #${channel.name}` : `Удалить канал #${channel.name}`}
+                >
+                  ×
+                </button>
+              </div>
             ))}
 
           <div
@@ -1453,28 +1571,53 @@ function App() {
             <span className={`discordChevron ${collapsedCategories.voice ? "collapsed" : ""}`}>▼</span>
             <span>{en ? "VOICE CHANNELS" : "ГОЛОСОВЫЕ КАНАЛЫ"}</span>
             <span className="categoryCount">{channels.filter((c) => c.type === "voice").length}</span>
+            <button
+              type="button"
+              className="discordCategoryAddBtn"
+              onClick={(e) => {
+                e.stopPropagation();
+                setCreateChannelType("voice");
+                setCreateChannelOpen(true);
+              }}
+              title={en ? "Create Voice Channel" : "Создать голосовой канал"}
+            >
+              +
+            </button>
           </div>
           {!collapsedCategories.voice && channels
             .filter((channel) => channel.type === "voice")
             .map((channel) => (
               <React.Fragment key={channel.id}>
-                <button
-                  className={
-                    "discordChannelBtn voiceChan " + (voice === channel.name ? "connected" : "")
-                  }
-                  onClick={() => void joinVoice(channel.name)}
-                  disabled={callStatus === "connecting"}
-                >
-                  <i className="chanIcon">🔊</i>
-                  <span className="chanName">{channel.name}</span>
-                  {voice === channel.name && (
-                    <span className="voiceSignalPill">
-                      <span className="voiceSignalBar" />
-                      <span className="voiceSignalBar" />
-                      <span className="voiceSignalBar" />
-                    </span>
-                  )}
-                </button>
+                <div className="discordChannelRow">
+                  <button
+                    className={
+                      "discordChannelBtn voiceChan " + (voice === channel.name ? "connected" : "")
+                    }
+                    onClick={() => void joinVoice(channel.name)}
+                    disabled={callStatus === "connecting"}
+                  >
+                    <i className="chanIcon">🔊</i>
+                    <span className="chanName">{channel.name}</span>
+                    {voice === channel.name && (
+                      <span className="voiceSignalPill">
+                        <span className="voiceSignalBar" />
+                        <span className="voiceSignalBar" />
+                        <span className="voiceSignalBar" />
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="discordChanDeleteBtn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void deleteChannel(channel.id, channel.name);
+                    }}
+                    title={en ? `Delete ${channel.name}` : `Удалить канал ${channel.name}`}
+                  >
+                    ×
+                  </button>
+                </div>
                 {voice === channel.name && (
                   <div className="discordChannelUsers">
                     {participants.map((participant) => (
@@ -2178,6 +2321,112 @@ function App() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      {createChannelOpen && (
+        <div
+          className="discordVolumeModalOverlay"
+          onClick={() => setCreateChannelOpen(false)}
+        >
+          <div
+            className="discordVolumeModalBox discordCreateChanModalBox"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="discordVolumeModalHeader">
+              <div>
+                <h3>{en ? "Create Channel" : "Создать канал"}</h3>
+                <small>
+                  {createChannelType === "text"
+                    ? (en ? "in Text Channels" : "в категории Текстовые каналы")
+                    : (en ? "in Voice Channels" : "в категории Голосовые каналы")}
+                </small>
+              </div>
+              <button
+                className="volumeModalCloseBtn"
+                onClick={() => setCreateChannelOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void createChannel(newChannelName, createChannelType);
+              }}
+              style={{ padding: "0 20px 20px" }}
+            >
+              <div className="discordModalSectionLabel">
+                {en ? "CHANNEL TYPE" : "ТИП КАНАЛА"}
+              </div>
+              <div className="discordTypeRadioGroup">
+                <div
+                  className={`discordTypeRadioCard ${createChannelType === "text" ? "active" : ""}`}
+                  onClick={() => setCreateChannelType("text")}
+                >
+                  <span className="typeIcon">#</span>
+                  <div className="typeMeta">
+                    <b>{en ? "Text" : "Текстовый"}</b>
+                    <small>
+                      {en
+                        ? "Post messages, images, and chat with members"
+                        : "Публикуйте сообщения, изображения и общайтесь в чате"}
+                    </small>
+                  </div>
+                  <span className="radioCheck">{createChannelType === "text" ? "●" : "○"}</span>
+                </div>
+                <div
+                  className={`discordTypeRadioCard ${createChannelType === "voice" ? "active" : ""}`}
+                  onClick={() => setCreateChannelType("voice")}
+                >
+                  <span className="typeIcon">🔊</span>
+                  <div className="typeMeta">
+                    <b>{en ? "Voice" : "Голосовой"}</b>
+                    <small>
+                      {en
+                        ? "Hang out with voice, video, and screen sharing"
+                        : "Общайтесь голосом, видео и включайте демонстрацию экрана"}
+                    </small>
+                  </div>
+                  <span className="radioCheck">{createChannelType === "voice" ? "●" : "○"}</span>
+                </div>
+              </div>
+
+              <div className="discordModalSectionLabel" style={{ marginTop: "16px" }}>
+                {en ? "CHANNEL NAME" : "НАЗВАНИЕ КАНАЛА"}
+              </div>
+              <div className="discordChanNameInputWrapper">
+                <span className="chanPrefix">{createChannelType === "text" ? "#" : "🔊"}</span>
+                <input
+                  type="text"
+                  value={newChannelName}
+                  onChange={(e) => setNewChannelName(e.target.value)}
+                  placeholder={createChannelType === "text" ? (en ? "new-channel" : "новый-канал") : (en ? "General Voice" : "Основной голос")}
+                  maxLength={64}
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div className="discordModalFooter">
+                <button
+                  type="button"
+                  className="discordModalCancelBtn"
+                  onClick={() => setCreateChannelOpen(false)}
+                >
+                  {en ? "Cancel" : "Отмена"}
+                </button>
+                <button
+                  type="submit"
+                  className="discordModalSubmitBtn"
+                  disabled={!newChannelName.trim() || createChannelLoading}
+                >
+                  {createChannelLoading
+                    ? (en ? "Creating..." : "Создание...")
+                    : (en ? "Create Channel" : "Создать канал")}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
