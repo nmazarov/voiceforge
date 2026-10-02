@@ -612,6 +612,20 @@ function App() {
                   return updated;
                 });
               }
+            } else if (data.event === "user:updated") {
+              const updated = data.payload as ServerUser;
+              if (updated) {
+                setServerUsers((prev) => {
+                  const exists = prev.some((u) => u.id === updated.id);
+                  if (exists) {
+                    return prev.map((u) => (u.id === updated.id ? { ...u, ...updated } : u));
+                  }
+                  return [...prev, updated];
+                });
+                if (updated.username === usernameRef.current) {
+                  setMyRole(updated.role);
+                }
+              }
             }
           } catch {}
         };
@@ -781,6 +795,52 @@ function App() {
       }
     } catch (err) {
       console.error("Failed to delete channel:", err);
+    }
+  }
+
+  async function updateUserRole(targetUserId: number, targetUsername: string, newRole: Role) {
+    try {
+      const res = await fetch(`${server}/api/users/${targetUserId}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ role: newRole }),
+      });
+      if (res.ok) {
+        setServerUsers((prev) =>
+          prev.map((u) => (u.id === targetUserId ? { ...u, role: newRole } : u))
+        );
+        playSound("click");
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || (en ? "Failed to update role" : "Не удалось обновить роль"));
+      }
+    } catch (err) {
+      console.error("Failed to update user role:", err);
+    }
+  }
+
+  async function toggleUserBlocked(targetUserId: number, targetUsername: string, disabled: boolean) {
+    if (
+      !window.confirm(
+        disabled
+          ? (en ? `Block user ${targetUsername}?` : `Заблокировать пользователя ${targetUsername}?`)
+          : (en ? `Unblock user ${targetUsername}?` : `Разблокировать пользователя ${targetUsername}?`)
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch(`${server}/api/users/${targetUserId}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ disabled }),
+      });
+      if (res.ok) {
+        void loadUsers();
+        playSound("click");
+      }
+    } catch (err) {
+      console.error("Failed to toggle block:", err);
     }
   }
   useEffect(() => {
@@ -2416,10 +2476,23 @@ function App() {
           <div className="discordVolumeModalContent" onClick={(e) => e.stopPropagation()}>
             <div className="discordVolumeModalHead">
               <div className="volumeUserHeader">
-                <Avatar name={volumeMenuUser} />
+                <span className="discordOnlineDot">●</span>
                 <div>
-                  <b className="volumeModalName">{volumeMenuUser}</b>
-                  <span className="volumeModalSub">{en ? "User Volume Settings" : "Настройки громкости пользователя"}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <b
+                      className="volumeModalName"
+                      style={{
+                        color:
+                          getUserRole(volumeMenuUser) !== "user"
+                            ? getRoleBadge(getUserRole(volumeMenuUser), en).color
+                            : "#f2f3f5",
+                      }}
+                    >
+                      {volumeMenuUser}
+                    </b>
+                    <RoleBadge role={getUserRole(volumeMenuUser)} en={en} />
+                  </div>
+                  <span className="volumeModalSub">{en ? "User Settings & Permissions" : "Управление пользователем"}</span>
                 </div>
               </div>
               <button className="volumeModalCloseBtn" onClick={() => setVolumeMenuUser(null)}>✕</button>
@@ -2464,6 +2537,52 @@ function App() {
                   150% ({en ? "Boost" : "Усиление"})
                 </button>
               </div>
+
+              {/* Role & Access Management */}
+              {(() => {
+                const targetObj = serverUsers.find((u) => u.username === volumeMenuUser);
+                const targetRole = targetObj ? targetObj.role : getUserRole(volumeMenuUser);
+                const targetId = targetObj ? targetObj.id : null;
+                const canManageRoles = myRole === "owner" && targetRole !== "owner" && targetId !== null;
+                const canModerate = (myRole === "owner" || myRole === "admin") && targetRole !== "owner" && targetId !== null;
+
+                if (!canManageRoles && !canModerate) return null;
+
+                return (
+                  <div className="userRoleManagementSection">
+                    <span className="volumeLabel">
+                      {en ? "ROLE & ACCESS" : "РОЛЬ И ДОСТУП"}
+                    </span>
+                    <div className="userRoleActionButtons">
+                      {canManageRoles && (
+                        <button
+                          type="button"
+                          className="roleToggleActionBtn"
+                          onClick={() => {
+                            const newRole: Role = targetRole === "admin" ? "user" : "admin";
+                            void updateUserRole(targetId, volumeMenuUser, newRole);
+                          }}
+                        >
+                          {targetRole === "admin"
+                            ? (en ? "🛡️ Demote to Member" : "🛡️ Снять роль Администратора")
+                            : (en ? "🛡️ Promote to Administrator" : "🛡️ Назначить Администратором")}
+                        </button>
+                      )}
+                      {canModerate && (
+                        <button
+                          type="button"
+                          className="userBlockActionBtn"
+                          onClick={() => {
+                            void toggleUserBlocked(targetId, volumeMenuUser, true);
+                          }}
+                        >
+                          {en ? "🚫 Block User" : "🚫 Заблокировать аккаунт"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
