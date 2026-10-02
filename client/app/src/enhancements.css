@@ -1981,11 +1981,13 @@ body { font-size: 14px; }
 
 /* Discord Bottom User Profile Bar */
 .discordUserPanel {
+  height: 56px;
+  min-height: 56px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
-  background: #0a0d16;
+  padding: 0 10px;
+  background: #090c14;
   border-top: 1px solid #1a2030;
   z-index: 20;
 }
@@ -2020,36 +2022,41 @@ body { font-size: 14px; }
 .discordUserText {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   min-width: 0;
+  gap: 1px;
 }
 .discordUsername {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: #f2f3f5;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.2;
 }
 .discordSubtext {
-  font-size: 10px;
+  font-size: 11px;
   color: #7b869e;
+  line-height: 1.2;
 }
 .discordUserControls {
   display: flex;
   align-items: center;
   gap: 2px;
+  flex-shrink: 0;
 }
 .userControlBtn {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border: 0;
   border-radius: 6px;
   background: transparent;
   color: #949ba4;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
+  padding: 0;
   transition: all 0.15s ease;
 }
 .userControlBtn svg {
@@ -2676,15 +2683,17 @@ body { font-size: 14px; }
 /* User Panel Without Circle */
 .discordOnlineDot {
   color: #23a55a;
-  font-size: 11px;
-  margin-right: 6px;
+  font-size: 10px;
+  line-height: 1;
+  margin: 0;
   flex-shrink: 0;
 }
 .discordUserNameRow {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+  white-space: nowrap;
 }
 
 /* Clean Message Content without Circle */
@@ -3114,3 +3123,235 @@ body { font-size: 14px; }
     transform: translateY(-3px);
   }
 }
+
+
+/* Global Geometric Precision & Alignment */
+.serverHead {
+  height: 56px !important;
+  min-height: 56px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 16px !important;
+  border-bottom: 1px solid #1a2030 !important;
+  background: #111420 !important;
+}
+.serverHead small {
+  display: block !important;
+  color: #727d96 !important;
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  letter-spacing: 1px !important;
+  text-transform: uppercase !important;
+}
+.serverHead b {
+  display: block !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: #f2f3f5 !important;
+  margin-top: 2px !important;
+  max-width: 170px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+.serverHead button {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+  border: 1px solid #242b3f !important;
+  background: #151925 !important;
+  color: #8e97ac !important;
+  display: grid !important;
+  place-items: center !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+.serverHead button:hover {
+  background: #202738 !important;
+  color: #fff !important;
+}
+
+.content > header {
+  height: 56px !important;
+  min-height: 56px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 18px !important;
+  border-bottom: 1px solid #1a2030 !important;
+  background: rgba(14, 17, 27, 0.95) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+  z-index: 10 !important;
+}
+.title {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+.title > i {
+  font-style: normal !important;
+  font-size: 22px !important;
+  font-weight: 500 !important;
+  color: #727d96 !important;
+  line-height: 1 !important;
+}
+.title b {
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  color: #f2f3f5 !important;
+  line-height: 1.2 !important;
+}
+.title small {
+  font-size: 11px !important;
+  color: #828ea8 !important;
+  line-height: 1.2 !important;
+  margin-top: 1px !important;
+}
+.headerBtns {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+.headerPingBadge {
+  height: 32px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 0 10px !important;
+  border-radius: 8px !important;
+  border: 1px solid #242b3f !important;
+  background: #141824 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #949ba4 !important;
+}
+.headerBtns button {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+  border: 1px solid #242b3f !important;
+  background: #141824 !important;
+  color: #8e97ac !important;
+  display: grid !important;
+  place-items: center !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+.headerBtns button:hover {
+  background: #1e2436 !important;
+  border-color: #3b4664 !important;
+  color: #fff !important;
+}
+.headerBtns button.active {
+  background: #2b224c !important;
+  border-color: #6d3bff !important;
+  color: #c8afff !important;
+}
+
+.discordCategoryHead {
+  display: flex !important;
+  align-items: center !important;
+  padding: 16px 10px 6px !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.6px !important;
+  color: #8c97ad !important;
+  cursor: pointer !important;
+}
+.categoryCount {
+  margin-left: auto !important;
+  margin-right: 6px !important;
+  font-size: 10px !important;
+  background: #1a2030 !important;
+  color: #727d96 !important;
+  border-radius: 999px !important;
+  padding: 1px 6px !important;
+  font-weight: 700 !important;
+}
+.discordCategoryAddBtn {
+  width: 20px !important;
+  height: 20px !important;
+  border-radius: 4px !important;
+  border: none !important;
+  background: transparent !important;
+  color: #8c97ad !important;
+  font-size: 15px !important;
+  display: grid !important;
+  place-items: center !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+}
+.discordCategoryAddBtn:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #fff !important;
+}
+
+.discordMemberCategoryHead {
+  padding: 14px 12px 6px !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  color: #8c97ad !important;
+  letter-spacing: 0.6px !important;
+  text-transform: uppercase !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+.discordMemberItem {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 6px 10px !important;
+  border-radius: 8px !important;
+  margin: 1px 0 !important;
+  border: 1px solid transparent !important;
+  cursor: pointer !important;
+  transition: background 0.12s, border-color 0.12s !important;
+}
+.discordMemberItem:hover {
+  background: #171d2b !important;
+}
+.discordMemberItem.speaking {
+  background: rgba(35, 165, 90, 0.12) !important;
+  border-color: rgba(35, 165, 90, 0.45) !important;
+}
+.discordMemberStatusDot {
+  font-size: 10px !important;
+  width: 10px !important;
+  height: 10px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+.discordMemberInfo {
+  flex: 1 !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  gap: 2px !important;
+}
+.discordMemberNameRow {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  min-width: 0 !important;
+}
+.discordMemberNameText {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #dbdee1 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+.discordMemberSubtext {
+  font-size: 11px !important;
+  color: #7b869e !important;
+  line-height: 1.2 !important;
+}
+
+.discordUserPanelRoleIcon { font-size: 12px; line-height: 1; vertical-align: middle; flex-shrink: 0; margin-left: 2px; }

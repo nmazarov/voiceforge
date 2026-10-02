@@ -2051,7 +2051,11 @@ function App() {
                 >
                   {username}
                 </b>
-                <RoleBadge role={myRole} en={en} />
+                {myRole !== "user" && (
+                  <span className="discordUserPanelRoleIcon" title={getRoleBadge(myRole, en).name}>
+                    {getRoleBadge(myRole, en).icon}
+                  </span>
+                )}
               </div>
               <small className="discordSubtext">{en ? "Online" : "В сети"}</small>
             </div>
