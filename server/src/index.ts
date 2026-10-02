@@ -108,6 +108,11 @@ app.get('/api/ws', { websocket: true }, (connection, req) => {
           emoji: data.emoji,
           username: user!.username,
         });
+      } else if (data.event === 'typing') {
+        broadcast('user:typing', {
+          channel_id: Number(data.channelId),
+          username: user!.username,
+        });
       }
     } catch {}
   });
@@ -120,7 +125,7 @@ app.get('/api/channels/:id/messages',async(req:any,reply)=>{
   const u=auth(req);
   if(!u)return reply.code(401).send({error:'Unauthorized'});
   const raw=db.prepare(`
-    SELECT m.id,m.body,m.created_at,m.reply_to_id,m.attachment_url,u.username,
+    SELECT m.id,m.body,m.created_at,m.edited_at,m.reply_to_id,m.attachment_url,u.username,
            r.username as reply_user,r.body as reply_body
     FROM messages m
     JOIN users u ON u.id=m.user_id
@@ -132,6 +137,8 @@ app.get('/api/channels/:id/messages',async(req:any,reply)=>{
     id:m.id,
     body:m.body,
     created_at:m.created_at,
+    is_edited:Boolean(m.edited_at),
+    edited_at:m.edited_at,
     username:m.username,
     attachment:m.attachment_url,
     reply_to:m.reply_to_id?{id:m.reply_to_id,username:m.reply_user||'user',body:m.reply_body||''}:null,
@@ -168,6 +175,33 @@ app.post('/api/channels/:id/messages',async(req:any,reply)=>{
   };
   broadcast('message:created',msg);
   return msg;
+});
+app.patch('/api/channels/:channelId/messages/:messageId',async(req:any,reply)=>{
+  const u=auth(req);
+  if(!u)return reply.code(401).send({error:'Unauthorized'});
+  const msgId=Number(req.params.messageId);
+  const chanId=Number(req.params.channelId);
+  const {body}=z.object({body:z.string().min(1).max(5000)}).parse(req.body);
+  const msg=db.prepare('SELECT user_id FROM messages WHERE id=?').get(msgId) as any;
+  if(!msg)return reply.code(404).send({error:'Message not found'});
+  if(msg.user_id!==u.id&&u.role!=='admin'&&u.role!=='owner')return reply.code(403).send({error:'Forbidden'});
+  const now=new Date().toISOString();
+  db.prepare('UPDATE messages SET body=?,edited_at=? WHERE id=?').run(body,now,msgId);
+  broadcast('message:updated',{id:msgId,channel_id:chanId,body,is_edited:true,edited_at:now});
+  return{ok:true,id:msgId,body,is_edited:true,edited_at:now};
+});
+app.delete('/api/channels/:channelId/messages/:messageId',async(req:any,reply)=>{
+  const u=auth(req);
+  if(!u)return reply.code(401).send({error:'Unauthorized'});
+  const msgId=Number(req.params.messageId);
+  const chanId=Number(req.params.channelId);
+  const msg=db.prepare('SELECT user_id FROM messages WHERE id=?').get(msgId) as any;
+  if(!msg)return reply.code(404).send({error:'Message not found'});
+  if(msg.user_id!==u.id&&u.role!=='admin'&&u.role!=='owner')return reply.code(403).send({error:'Forbidden'});
+  db.prepare('DELETE FROM messages WHERE id=?').run(msgId);
+  try{db.prepare('DELETE FROM reactions WHERE message_id=?').run(msgId);}catch{}
+  broadcast('message:deleted',{id:msgId,channel_id:chanId});
+  return{ok:true,id:msgId};
 });
 app.post('/api/livekit/token',async(req:any,reply)=>{const u=auth(req);if(!u)return reply.code(401).send({error:'Unauthorized'});const row=db.prepare('SELECT disabled FROM users WHERE id=?').get(u.id) as any;if(!row||row.disabled)return reply.code(403).send({error:'Account disabled'});const {room}=z.object({room:z.string().min(1).max(64)}).parse(req.body);const t=new AccessToken(LIVEKIT_API_KEY,LIVEKIT_API_SECRET,{identity:String(u.id),name:u.username});t.addGrant({roomJoin:true,room,canPublish:true,canSubscribe:true,canPublishData:true});return{token:await t.toJwt(),url:LIVEKIT_PUBLIC_URL}});
 await app.listen({port:PORT,host:'0.0.0.0'});

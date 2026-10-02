@@ -18,6 +18,8 @@ type Msg = {
   id: number;
   body: string;
   created_at: string;
+  is_edited?: boolean;
+  edited_at?: string | null;
   username: string;
   reply_to?: { id: number; username: string; body: string } | null;
   attachment?: string | null;
@@ -406,7 +408,10 @@ function App() {
         return {};
       }
     }),
-    [volumeMenuUser, setVolumeMenuUser] = useState<string | null>(null);
+    [volumeMenuUser, setVolumeMenuUser] = useState<string | null>(null),
+    [editingMessageId, setEditingMessageId] = useState<number | null>(null),
+    [editingText, setEditingText] = useState(""),
+    [typingUsers, setTypingUsers] = useState<Record<string, number>>({});
   const en = settings.language === "en";
   const mediaRef = useRef<HTMLDivElement>(null),
     deafenedRef = useRef(false),
@@ -417,7 +422,8 @@ function App() {
     noiseGateRef = useRef<{ stop: () => void } | null>(null),
     fileInputRef = useRef<HTMLInputElement>(null),
     wsRef = useRef<WebSocket | null>(null),
-    remoteGainsRef = useRef<Record<string, GainNode>>({});
+    remoteGainsRef = useRef<Record<string, GainNode>>({}),
+    lastTypingSentRef = useRef<number>(0);
   const headers = {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
@@ -480,6 +486,35 @@ function App() {
                 if (newMsg.username !== usernameRef.current) {
                   playSound("message");
                 }
+              }
+              if (newMsg?.username) {
+                setTypingUsers((prev) => {
+                  if (!prev[newMsg.username]) return prev;
+                  const next = { ...prev };
+                  delete next[newMsg.username];
+                  return next;
+                });
+              }
+            } else if (data.event === "message:updated") {
+              const updated = data.payload;
+              if (activeTextRef.current && updated && updated.channel_id === activeTextRef.current.id) {
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === updated.id
+                      ? { ...m, body: updated.body, is_edited: true, edited_at: updated.edited_at }
+                      : m
+                  )
+                );
+              }
+            } else if (data.event === "message:deleted") {
+              const deleted = data.payload;
+              if (activeTextRef.current && deleted && deleted.channel_id === activeTextRef.current.id) {
+                setMessages((prev) => prev.filter((m) => m.id !== deleted.id));
+              }
+            } else if (data.event === "user:typing") {
+              const { channel_id, username: typingUser } = data.payload || {};
+              if (activeTextRef.current && channel_id === activeTextRef.current.id && typingUser !== usernameRef.current) {
+                setTypingUsers((prev) => ({ ...prev, [typingUser]: Date.now() + 3500 }));
               }
             } else if (data.event === "message:reaction") {
               const { messageId, emoji, username: reactingUser } = data.payload;
@@ -544,6 +579,59 @@ function App() {
       })
     );
     playSound("click");
+  }
+
+  function notifyTyping() {
+    if (!activeTextRef.current || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    const now = Date.now();
+    if (now - lastTypingSentRef.current > 2000) {
+      lastTypingSentRef.current = now;
+      wsRef.current.send(
+        JSON.stringify({
+          event: "typing",
+          channelId: activeTextRef.current.id,
+        })
+      );
+    }
+  }
+
+  async function editMessage(msgId: number, newBody: string) {
+    if (!activeText || !newBody.trim()) return;
+    try {
+      const res = await fetch(`${server}/api/channels/${activeText.id}/messages/${msgId}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ body: newBody.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === msgId ? { ...m, body: data.body, is_edited: true, edited_at: data.edited_at } : m
+          )
+        );
+        setEditingMessageId(null);
+        setEditingText("");
+      }
+    } catch (err) {
+      console.error("Failed to edit message:", err);
+    }
+  }
+
+  async function deleteMessage(msgId: number) {
+    if (!activeText) return;
+    if (!window.confirm(en ? "Are you sure you want to delete this message?" : "Удалить это сообщение?")) return;
+    try {
+      const res = await fetch(`${server}/api/channels/${activeText.id}/messages/${msgId}`, {
+        method: "DELETE",
+        headers,
+      });
+      if (res.ok) {
+        setMessages((prev) => prev.filter((m) => m.id !== msgId));
+      }
+    } catch (err) {
+      console.error("Failed to delete message:", err);
+    }
   }
   useEffect(() => {
     if (!notice) return;
@@ -1774,7 +1862,52 @@ function App() {
                           {new Date(message.created_at).toLocaleString()}
                         </small>
                       </div>
-                      <MarkdownMessage content={message.body} />
+                      {editingMessageId === message.id ? (
+                        <div className="discordInlineEditBox">
+                          <textarea
+                            value={editingText}
+                            onChange={(e) => setEditingText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                void editMessage(message.id, editingText);
+                              } else if (e.key === "Escape") {
+                                setEditingMessageId(null);
+                              }
+                            }}
+                            autoFocus
+                            rows={2}
+                          />
+                          <div className="discordInlineEditHint">
+                            <span>
+                              {en ? "escape to " : "escape для "}
+                              <a onClick={() => setEditingMessageId(null)}>
+                                {en ? "cancel" : "отмены"}
+                              </a>{" "}
+                              • {en ? "enter to " : "enter для "}
+                              <a onClick={() => void editMessage(message.id, editingText)}>
+                                {en ? "save" : "сохранения"}
+                              </a>
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <MarkdownMessage content={message.body} />
+                          {message.is_edited && (
+                            <span
+                              className="discordEditedBadge"
+                              title={
+                                message.edited_at
+                                  ? new Date(message.edited_at).toLocaleString()
+                                  : ""
+                              }
+                            >
+                              {en ? "(edited)" : "(изменено)"}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       {message.attachment && (
                         <div className="discordAttachmentWrapper">
                           <img
@@ -1811,6 +1944,25 @@ function App() {
                       <button onClick={() => toggleReaction(message.id, "🔥")} title="🔥">🔥</button>
                       <button onClick={() => toggleReaction(message.id, "😂")} title="😂">😂</button>
                       <button onClick={() => setReplyTo(message)} title={en ? "Reply" : "Ответить"}>💬</button>
+                      {message.username === username && (
+                        <>
+                          <button
+                            onClick={() => {
+                              setEditingMessageId(message.id);
+                              setEditingText(message.body);
+                            }}
+                            title={en ? "Edit" : "Редактировать"}
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => void deleteMessage(message.id)}
+                            title={en ? "Delete" : "Удалить"}
+                          >
+                            🗑️
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1845,6 +1997,31 @@ function App() {
                 </button>
               </div>
             )}
+            {Object.entries(typingUsers).filter(([_, exp]) => exp > Date.now()).length > 0 && (
+              <div className="discordTypingBar">
+                <div className="discordTypingDots">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+                <span className="discordTypingText">
+                  {(() => {
+                    const typists = Object.entries(typingUsers)
+                      .filter(([_, exp]) => exp > Date.now())
+                      .map(([u]) => u);
+                    if (typists.length === 1) {
+                      return en ? `${typists[0]} is typing...` : `${typists[0]} печатает...`;
+                    } else if (typists.length === 2) {
+                      return en
+                        ? `${typists.join(" and ")} are typing...`
+                        : `${typists.join(" и ")} печатают...`;
+                    } else {
+                      return en ? "Several people are typing..." : "Несколько человек печатают...";
+                    }
+                  })()}
+                </span>
+              </div>
+            )}
             <input
               type="file"
               ref={fileInputRef}
@@ -1864,7 +2041,10 @@ function App() {
               <input
                 value={text}
                 maxLength={2000}
-                onChange={(event) => setText(event.target.value)}
+                onChange={(event) => {
+                  setText(event.target.value);
+                  notifyTyping();
+                }}
                 onPaste={handlePaste}
                 onKeyDown={(event) =>
                   event.key === "Enter" && !event.shiftKey && void send()

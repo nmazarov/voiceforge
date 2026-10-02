@@ -2320,3 +2320,98 @@ body { font-size: 14px; }
   border-color: #ef4444;
   color: #ff6b7b;
 }
+
+/* Typing Indicator */
+.discordTypingBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 24px;
+  padding: 0 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #949ba4;
+  margin-bottom: 2px;
+  user-select: none;
+}
+.discordTypingDots {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.discordTypingDots span {
+  width: 5px;
+  height: 5px;
+  background-color: #949ba4;
+  border-radius: 50%;
+  animation: discordTypingAnim 1.4s infinite ease-in-out both;
+}
+.discordTypingDots span:nth-child(1) {
+  animation-delay: -0.32s;
+}
+.discordTypingDots span:nth-child(2) {
+  animation-delay: -0.16s;
+}
+@keyframes discordTypingAnim {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+.discordTypingText {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Edited Message Badge */
+.discordEditedBadge {
+  font-size: 10px;
+  color: #80848e;
+  margin-left: 6px;
+  user-select: none;
+  font-weight: normal;
+  vertical-align: baseline;
+}
+
+/* Inline Message Edit Box */
+.discordInlineEditBox {
+  margin-top: 6px;
+  width: 100%;
+}
+.discordInlineEditBox textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: #2b2d31;
+  border: 1px solid #3b4252;
+  border-radius: 6px;
+  color: #dbdee1;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+  padding: 8px 12px;
+  resize: vertical;
+  min-height: 44px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.discordInlineEditBox textarea:focus {
+  border-color: #5865f2;
+}
+.discordInlineEditHint {
+  font-size: 11px;
+  color: #949ba4;
+  margin-top: 4px;
+}
+.discordInlineEditHint a {
+  color: #00a8fc;
+  cursor: pointer;
+  text-decoration: none;
+}
+.discordInlineEditHint a:hover {
+  text-decoration: underline;
+}
