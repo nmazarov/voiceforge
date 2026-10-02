@@ -2621,3 +2621,107 @@ body { font-size: 14px; }
   cursor: not-allowed;
 }
 
+/* Role Badges & Colored Member Ranks */
+.discordRoleBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  user-select: none;
+  vertical-align: middle;
+}
+.discordRoleBadge .badgeIcon {
+  font-size: 10px;
+}
+.discordRoleBadge .badgeName {
+  font-size: 9px;
+  font-weight: 800;
+}
+
+/* User Panel Without Circle */
+.discordOnlineDot {
+  color: #23a55a;
+  font-size: 11px;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+.discordUserNameRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* Clean Message Content without Circle */
+.discordMessageContent.noAvatar {
+  display: block;
+  width: 100%;
+}
+.discordMessageContent.noAvatar .meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+/* Member List Without Circles */
+.discordMemberCategoryHead {
+  padding: 14px 10px 6px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #949ba4;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.discordMemberItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  margin-bottom: 2px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.discordMemberItem:hover {
+  background: #171d2b;
+}
+.discordMemberStatusDot {
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.discordMemberInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.discordMemberNameRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.discordMemberNameText {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.discordMemberSubtext {
+  font-size: 10px;
+  color: #828ea8;
+}
+
+

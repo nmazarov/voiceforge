@@ -146,11 +146,16 @@ app.delete('/api/channels/:id',async(req:any,reply)=>{
   broadcast('channel:deleted',{id,name:chan.name,type:chan.type});
   return{ok:true,id};
 });
+app.get('/api/users',async(req:any,reply)=>{
+  const u=auth(req);
+  if(!u)return reply.code(401).send({error:'Unauthorized'});
+  return db.prepare(`SELECT id,username,role,created_at FROM users WHERE disabled=0 ORDER BY CASE role WHEN 'owner' THEN 1 WHEN 'admin' THEN 2 ELSE 3 END, username ASC`).all();
+});
 app.get('/api/channels/:id/messages',async(req:any,reply)=>{
   const u=auth(req);
   if(!u)return reply.code(401).send({error:'Unauthorized'});
   const raw=db.prepare(`
-    SELECT m.id,m.body,m.created_at,m.edited_at,m.reply_to_id,m.attachment_url,u.username,
+    SELECT m.id,m.body,m.created_at,m.edited_at,m.reply_to_id,m.attachment_url,u.username,u.role,
            r.username as reply_user,r.body as reply_body
     FROM messages m
     JOIN users u ON u.id=m.user_id
@@ -165,6 +170,7 @@ app.get('/api/channels/:id/messages',async(req:any,reply)=>{
     is_edited:Boolean(m.edited_at),
     edited_at:m.edited_at,
     username:m.username,
+    role:m.role||'user',
     attachment:m.attachment_url,
     reply_to:m.reply_to_id?{id:m.reply_to_id,username:m.reply_user||'user',body:m.reply_body||''}:null,
     reactions:{}
@@ -173,7 +179,7 @@ app.get('/api/channels/:id/messages',async(req:any,reply)=>{
 app.post('/api/channels/:id/messages',async(req:any,reply)=>{
   const u=auth(req);
   if(!u)return reply.code(401).send({error:'Unauthorized'});
-  const row=db.prepare('SELECT disabled FROM users WHERE id=?').get(u.id) as any;
+  const row=db.prepare('SELECT disabled,role FROM users WHERE id=?').get(u.id) as any;
   if(!row||row.disabled)return reply.code(403).send({error:'Account disabled'});
   const {body,reply_to,attachment}=z.object({
     body:z.string().min(1).max(5000),
@@ -192,6 +198,7 @@ app.post('/api/channels/:id/messages',async(req:any,reply)=>{
     channel_id:Number(req.params.id),
     user_id:u.id,
     username:u.username,
+    role:row.role||u.role||'user',
     body,
     reply_to:reply_to||null,
     attachment:attachment||null,

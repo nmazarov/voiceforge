@@ -14,6 +14,59 @@ import "./style.css";
 import "./enhancements.css";
 
 type Channel = { id: number; name: string; type: "text" | "voice" };
+type Role = "owner" | "admin" | "user";
+type ServerUser = { id: number; username: string; role: Role };
+
+function getRoleBadge(role?: string, en = false) {
+  if (role === "owner") {
+    return {
+      name: en ? "Owner" : "Создатель",
+      short: en ? "Owner" : "Владелец",
+      icon: "👑",
+      color: "#f59e0b",
+      bg: "rgba(245, 158, 11, 0.15)",
+      border: "rgba(245, 158, 11, 0.35)",
+    };
+  }
+  if (role === "admin") {
+    return {
+      name: en ? "Admin" : "Администратор",
+      short: en ? "Admin" : "Админ",
+      icon: "🛡️",
+      color: "#8b5cf6",
+      bg: "rgba(139, 92, 246, 0.15)",
+      border: "rgba(139, 92, 246, 0.35)",
+    };
+  }
+  return {
+    name: en ? "Member" : "Участник",
+    short: en ? "Member" : "Участник",
+    icon: "👤",
+    color: "#94a3b8",
+    bg: "rgba(148, 163, 184, 0.12)",
+    border: "rgba(148, 163, 184, 0.25)",
+  };
+}
+
+function RoleBadge({ role, en }: { role?: string; en?: boolean }) {
+  if (!role || role === "user") return null;
+  const badge = getRoleBadge(role, en);
+  return (
+    <span
+      className="discordRoleBadge"
+      style={{
+        color: badge.color,
+        background: badge.bg,
+        border: `1px solid ${badge.border}`,
+      }}
+      title={badge.name}
+    >
+      <span className="badgeIcon">{badge.icon}</span>
+      <span className="badgeName">{badge.short}</span>
+    </span>
+  );
+}
+
 type Msg = {
   id: number;
   body: string;
@@ -21,6 +74,7 @@ type Msg = {
   is_edited?: boolean;
   edited_at?: string | null;
   username: string;
+  role?: Role;
   reply_to?: { id: number; username: string; body: string } | null;
   attachment?: string | null;
   reactions?: Record<string, string[]>;
@@ -415,7 +469,9 @@ function App() {
     [createChannelOpen, setCreateChannelOpen] = useState(false),
     [createChannelType, setCreateChannelType] = useState<"text" | "voice">("text"),
     [newChannelName, setNewChannelName] = useState(""),
-    [createChannelLoading, setCreateChannelLoading] = useState(false);
+    [createChannelLoading, setCreateChannelLoading] = useState(false),
+    [serverUsers, setServerUsers] = useState<ServerUser[]>([]),
+    [myRole, setMyRole] = useState<Role>("user");
   const en = settings.language === "en";
   const mediaRef = useRef<HTMLDivElement>(null),
     deafenedRef = useRef(false),
@@ -760,6 +816,7 @@ function App() {
         const data = await response.json();
         if (active) {
           setUsername(data.user.username);
+          if (data.user.role) setMyRole(data.user.role);
           localStorage.setItem("vf_user", data.user.username);
           setSessionReady(true);
         }
@@ -773,6 +830,33 @@ function App() {
       active = false;
     };
   }, [token]);
+
+  useEffect(() => {
+    if (token) {
+      void loadUsers();
+    }
+  }, [token, server]);
+
+  async function loadUsers() {
+    if (!token) return;
+    try {
+      const res = await fetch(`${API()}/api/users`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) setServerUsers(data);
+      }
+    } catch {}
+  }
+
+  function getUserRole(uName: string): Role {
+    if (uName === username && myRole) return myRole;
+    const found = serverUsers.find((u) => u.username === uName);
+    if (found) return found.role;
+    return "user";
+  }
+
   async function loadChannels() {
     try {
       const response = await fetch(`${API()}/api/channels`);
@@ -1707,12 +1791,19 @@ function App() {
             onClick={() => setSettingsOpen(true)}
             title={en ? "Open Settings" : "Открыть настройки"}
           >
-            <div className="discordAvatarWithStatus">
-              <Avatar name={username} />
-              <span className="onlineIndicator" />
-            </div>
+            <span className="discordOnlineDot">●</span>
             <div className="discordUserText">
-              <b className="discordUsername">{username}</b>
+              <div className="discordUserNameRow">
+                <b
+                  className="discordUsername"
+                  style={{
+                    color: myRole !== "user" ? getRoleBadge(myRole, en).color : "#f2f3f5",
+                  }}
+                >
+                  {username}
+                </b>
+                <RoleBadge role={myRole} en={en} />
+              </div>
               <small className="discordSubtext">{en ? "Online" : "В сети"}</small>
             </div>
           </div>
@@ -1996,11 +2087,20 @@ function App() {
                       <span className="discordReplyText">{message.reply_to.body}</span>
                     </div>
                   )}
-                  <div className="discordMessageContent">
-                    <Avatar name={message.username} />
+                  <div className="discordMessageContent noAvatar">
                     <div className="discordMessageBody">
                       <div className="meta">
-                        <b>{message.username}</b>
+                        <b
+                          style={{
+                            color:
+                              (message.role || getUserRole(message.username)) !== "user"
+                                ? getRoleBadge(message.role || getUserRole(message.username), en).color
+                                : "#f2f3f5",
+                          }}
+                        >
+                          {message.username}
+                        </b>
+                        <RoleBadge role={message.role || getUserRole(message.username)} en={en} />
                         <small>
                           {new Date(message.created_at).toLocaleString()}
                         </small>
@@ -2236,29 +2336,73 @@ function App() {
       <aside
         className={"members " + (!membersVisible ? "membersCollapsed" : "")}
       >
-        <Section title={`${en ? "ONLINE" : "В СЕТИ"} — ${participants.length || 1}`} />
-        {(participants.length ? participants : [username]).map(
-          (participant) => (
-            <div
-              className={`member ${participant !== username ? "clickable" : ""}`}
-              key={participant}
-              onClick={() => participant !== username && setVolumeMenuUser(participant)}
-              title={participant !== username ? (en ? `Volume: ${userVolumes[participant] ?? 100}% (click to adjust)` : `Громкость: ${userVolumes[participant] ?? 100}% (нажмите для настройки)`) : undefined}
-            >
-              <Avatar name={participant} />
-              <div>
-                <b>{participant}</b>
-                <small>
-                  {voice ? (en ? "In voice channel" : "В голосовом канале") : "Online"}
-                  {participant !== username && (userVolumes[participant] ?? 100) !== 100 && (
-                    <span className="memberVolTag"> • {userVolumes[participant]}%</span>
-                  )}
-                </small>
+        {(() => {
+          const list = Array.from(
+            new Set([
+              ...participants,
+              ...serverUsers.map((u) => u.username),
+              username,
+            ].filter(Boolean))
+          );
+
+          const owners = list.filter((u) => getUserRole(u) === "owner");
+          const admins = list.filter((u) => getUserRole(u) === "admin");
+          const regular = list.filter((u) => {
+            const r = getUserRole(u);
+            return r !== "owner" && r !== "admin";
+          });
+
+          const groups = [
+            { title: en ? "OWNER" : "СОЗДАТЕЛЬ", members: owners, icon: "👑" },
+            { title: en ? "ADMINISTRATORS" : "АДМИНИСТРАТОРЫ", members: admins, icon: "🛡️" },
+            { title: en ? "MEMBERS" : "УЧАСТНИКИ", members: regular, icon: "👤" },
+          ].filter((g) => g.members.length > 0);
+
+          return groups.map((g) => (
+            <React.Fragment key={g.title}>
+              <div className="discordMemberCategoryHead">
+                <span>{g.icon} {g.title} — {g.members.length}</span>
               </div>
-              <em />
-            </div>
-          ),
-        )}
+              {g.members.map((participant) => {
+                const uRole = getUserRole(participant);
+                const badge = getRoleBadge(uRole, en);
+                const isOnline = participants.length === 0 || participants.includes(participant);
+                return (
+                  <div
+                    className={`discordMemberItem ${participant !== username ? "clickable" : ""}`}
+                    key={participant}
+                    onClick={() => participant !== username && setVolumeMenuUser(participant)}
+                    title={participant !== username ? (en ? `Volume: ${userVolumes[participant] ?? 100}% (click to adjust)` : `Громкость: ${userVolumes[participant] ?? 100}% (нажмите для настройки)`) : undefined}
+                  >
+                    <span
+                      className="discordMemberStatusDot"
+                      style={{ color: isOnline ? "#23a55a" : "#747f8d" }}
+                    >
+                      ●
+                    </span>
+                    <div className="discordMemberInfo">
+                      <div className="discordMemberNameRow">
+                        <b
+                          className="discordMemberNameText"
+                          style={{ color: uRole !== "user" ? badge.color : "#dbdee1" }}
+                        >
+                          {participant}
+                        </b>
+                        <RoleBadge role={uRole} en={en} />
+                      </div>
+                      <small className="discordMemberSubtext">
+                        {voice ? (en ? "In voice channel" : "В голосовом канале") : isOnline ? "Online" : "Offline"}
+                        {participant !== username && (userVolumes[participant] ?? 100) !== 100 && (
+                          <span className="memberVolTag"> • {userVolumes[participant]}%</span>
+                        )}
+                      </small>
+                    </div>
+                  </div>
+                );
+              })}
+            </React.Fragment>
+          ));
+        })()}
         <div className="node">
           <small>VOICEFORGE NODE</small>
           <b>Self-hosted</b>
