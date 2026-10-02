@@ -2040,29 +2040,47 @@ body { font-size: 14px; }
   gap: 2px;
 }
 .userControlBtn {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: #a4adc1;
-  font-size: 14px;
+  color: #949ba4;
   cursor: pointer;
-  display: grid;
-  place-items: center;
-  transition: background 0.12s, color 0.12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+.userControlBtn svg {
+  display: block;
+  transition: transform 0.15s ease, color 0.15s ease;
 }
 .userControlBtn:hover {
-  background: #202738;
-  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  color: #dbdee1;
+}
+.userControlBtn:hover svg {
+  transform: scale(1.08);
 }
 .userControlBtn.active {
-  background: #3b1f28;
+  background: rgba(237, 66, 69, 0.15);
+  color: #ed4245;
+}
+.userControlBtn.active:hover {
+  background: rgba(237, 66, 69, 0.25);
   color: #ff6b7b;
 }
 .userControlBtn.logout:hover {
-  background: #3b1f28;
-  color: #ff6b7b;
+  background: rgba(237, 66, 69, 0.15);
+  color: #ed4245;
+}
+
+.inlineMicIcon, .speakingInlineMic {
+  display: inline-block;
+  vertical-align: -2px;
+  color: #23a55a;
+  margin-right: 3px;
 }
 
 /* Header Ping Badge */

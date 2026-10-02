@@ -12,6 +12,18 @@ import {
 } from "livekit-client";
 import "./style.css";
 import "./enhancements.css";
+import {
+  MicIcon,
+  MicOffIcon,
+  HeadphonesIcon,
+  HeadphonesOffIcon,
+  GearIcon,
+  LogoutIcon,
+  ScreenShareIcon,
+  PhoneHangupIcon,
+  VolumeUpIcon,
+  VolumeMuteIcon,
+} from "./icons";
 
 type Channel = { id: number; name: string; type: "text" | "voice" };
 type Role = "owner" | "admin" | "user";
@@ -1930,7 +1942,7 @@ function App() {
                           className={`sidebarMic ${participantStates[participant]?.mic ? "on" : "off"}`}
                           title={participantStates[participant]?.mic ? (en ? "Microphone on" : "Микрофон включён") : (en ? "Microphone off" : "Микрофон выключен")}
                         >
-                          {participantStates[participant]?.mic ? "🎙" : "🔇"}
+                          {participantStates[participant]?.mic ? <MicIcon size={13} /> : <MicOffIcon size={13} />}
                         </span>
                         {participant !== username && (
                           <button
@@ -1942,7 +1954,7 @@ function App() {
                             }}
                             title={en ? `Volume: ${userVolumes[participant] ?? 100}%` : `Громкость: ${userVolumes[participant] ?? 100}%`}
                           >
-                            {(userVolumes[participant] ?? 100) === 0 ? "🔇" : "🔊"}
+                            {(userVolumes[participant] ?? 100) === 0 ? <VolumeMuteIcon size={13} /> : <VolumeUpIcon size={13} />}
                             {(userVolumes[participant] ?? 100) !== 100 && (
                               <span className="sidebarVolTag">{userVolumes[participant]}%</span>
                             )}
@@ -2014,28 +2026,28 @@ function App() {
               onClick={() => void toggleMute()}
               title={muted ? (en ? "Unmute Microphone" : "Включить микрофон") : (en ? "Mute Microphone" : "Заглушить микрофон")}
             >
-              {muted ? "🔇" : "🎙"}
+              {muted ? <MicOffIcon size={18} /> : <MicIcon size={18} />}
             </button>
             <button
               className={`userControlBtn ${deafened ? "active" : ""}`}
               onClick={() => void toggleDeafen()}
               title={deafened ? (en ? "Undeafen" : "Включить звук") : (en ? "Deafen" : "Заглушить звук")}
             >
-              {deafened ? "🔇" : "🎧"}
+              {deafened ? <HeadphonesOffIcon size={18} /> : <HeadphonesIcon size={18} />}
             </button>
             <button
               className={`userControlBtn ${settingsOpen ? "active" : ""}`}
               onClick={() => setSettingsOpen(true)}
               title={en ? "User Settings" : "Настройки"}
             >
-              ⚙
+              <GearIcon size={18} />
             </button>
             <button
               className="userControlBtn logout"
               onClick={logout}
               title={en ? "Log Out" : "Выйти из аккаунта"}
             >
-              ↪
+              <LogoutIcon size={18} />
             </button>
           </div>
         </div>
@@ -2170,7 +2182,9 @@ function App() {
                   <Avatar name={participant} large />
                   <b>{participant}</b>
                   <div className="voiceStatus">
-                    <span className="micState">{participantStates[participant]?.mic ? "🎙" : "🔇"}</span>
+                    <span className="micState">
+                      {participantStates[participant]?.mic ? <MicIcon size={14} /> : <MicOffIcon size={14} />}
+                    </span>
                     <small>
                       {index === 0 && muted && deafened
                         ? en ? "Microphone and sound off" : "Микрофон и звук выключены"
@@ -2225,7 +2239,7 @@ function App() {
                 className={muted ? "danger" : ""}
                 onClick={() => void toggleMute()}
               >
-                {muted ? "🔇" : "🎙"}
+                {muted ? <MicOffIcon size={18} /> : <MicIcon size={18} />}
                 <small>{muted ? (en ? "Unmute" : "Включить") : en ? "Microphone" : "Микрофон"}</small>
               </button>
               <button
@@ -2233,7 +2247,7 @@ function App() {
                 onClick={() => void share()}
                 disabled={sourceLoading || callStatus !== "connected"}
               >
-                ▣
+                <ScreenShareIcon size={18} />
                 <small>
                   {streamStatus === "starting"
                     ? en ? "Starting…" : "Запуск…"
@@ -2250,11 +2264,12 @@ function App() {
                 className={deafened ? "danger" : ""}
                 onClick={() => void toggleDeafen()}
               >
-                {deafened ? "🔇" : "🎧"}
+                {deafened ? <HeadphonesOffIcon size={18} /> : <HeadphonesIcon size={18} />}
                 <small>{deafened ? (en ? "Enable sound" : "Включить звук") : en ? "Sound" : "Звук"}</small>
               </button>
               <button className="hang" onClick={() => void leaveVoice()}>
-                ⌁<small>{en ? "Leave" : "Выйти"}</small>
+                <PhoneHangupIcon size={18} />
+                <small>{en ? "Leave" : "Выйти"}</small>
               </button>
             </div>
           </section>
@@ -2645,7 +2660,7 @@ function App() {
                       <small className="discordMemberSubtext">
                         {isSpeaking ? (
                           <span className="speakingSubtext">
-                            🎙️ {en ? "Speaking" : "Говорит"}
+                            <MicIcon size={12} className="inlineMicIcon" /> {en ? "Speaking" : "Говорит"}
                           </span>
                         ) : voice ? (
                           en ? "In voice channel" : "В голосовом канале"
@@ -2724,7 +2739,11 @@ function App() {
                   className={`volumeQuickBtn ${(userVolumes[volumeMenuUser] ?? 100) === 0 ? "active" : ""}`}
                   onClick={() => setUserVolume(volumeMenuUser, (userVolumes[volumeMenuUser] ?? 100) === 0 ? 100 : 0)}
                 >
-                  {(userVolumes[volumeMenuUser] ?? 100) === 0 ? (en ? "🔊 Unmute" : "🔊 Включить звук") : (en ? "🔇 Заглушить" : "🔇 Заглушить")}
+                  {(userVolumes[volumeMenuUser] ?? 100) === 0 ? (
+                    <><VolumeUpIcon size={14} /> {en ? "Unmute" : "Включить звук"}</>
+                  ) : (
+                    <><VolumeMuteIcon size={14} /> {en ? "Mute" : "Заглушить"}</>
+                  )}
                 </button>
                 <button
                   className="volumeQuickBtn"
@@ -3287,7 +3306,7 @@ function SettingsModal({
                   ?.scrollIntoView({ behavior: "smooth" })
               }
             >
-              🎙 {en ? "Voice & Video" : "Голос и видео"}
+              <MicIcon size={16} /> {en ? "Voice & Video" : "Голос и видео"}
             </button>
             <button
               onClick={() =>
@@ -3419,7 +3438,11 @@ function SettingsModal({
                       className={`loopbackBtn ${loopback ? "loopbackOn" : ""}`}
                       onClick={toggleLoopback}
                     >
-                      {loopback ? (en ? "🎧 Hear self: ON" : "🎧 Слышу себя: ВКЛ") : (en ? "🎧 Hear self (Off)" : "🎧 Слушать себя")}
+                      {loopback ? (
+                        <><HeadphonesIcon size={14} /> {en ? "Hear self: ON" : "Слышу себя: ВКЛ"}</>
+                      ) : (
+                        <><HeadphonesIcon size={14} /> {en ? "Hear self (Off)" : "Слушать себя"}</>
+                      )}
                     </button>
                   )}
                 </div>
