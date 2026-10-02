@@ -2319,20 +2319,25 @@ function App() {
         >
           {isDraggingFile && (
             <div className="discordDragDropOverlay">
-              <div className="discordDragDropContent">
-                <div className="discordDragDropIconWrap">
-                  <UploadIcon size={48} />
+              <div className="discordDragDropCard">
+                <div className="discordDragDropTarget">
+                  <div className="discordDragDropIconWrap">
+                    <UploadIcon size={26} />
+                  </div>
+                  <h3>
+                    {en ? "Upload to " : "Загрузить в "}
+                    <span className="dragDropChanBadge">#{activeText?.name || "general"}</span>
+                  </h3>
+                  <p>
+                    {en
+                      ? "Release to attach to your message"
+                      : "Отпустите файл для прикрепления к сообщению"}
+                  </p>
+                  <div className="dragDropPillsRow">
+                    <span className="dragDropPill">{en ? "Images & Files" : "Изображения и файлы"}</span>
+                    <span className="dragDropPill">{en ? "Max 5 MB" : "До 5 МБ"}</span>
+                  </div>
                 </div>
-                <h3>
-                  {en
-                    ? `Upload to #${activeText?.name || "chat"}`
-                    : `Загрузить в #${activeText?.name || "чат"}`}
-                </h3>
-                <p>
-                  {en
-                    ? "Drop image or file here (up to 5 MB)"
-                    : "Перетащите изображение или файл сюда (до 5 МБ)"}
-                </p>
               </div>
             </div>
           )}

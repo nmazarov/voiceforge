@@ -3003,79 +3003,114 @@ body { font-size: 14px; }
 
 .discordDragDropOverlay {
   position: absolute;
-  inset: 12px;
+  inset: 0;
   z-index: 120;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 18, 28, 0.88);
-  border: 2px dashed #7c3aed;
-  border-radius: 16px;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(9, 11, 16, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   pointer-events: none;
-  animation: dragDropFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  box-shadow: 0 0 35px rgba(124, 58, 237, 0.3), inset 0 0 40px rgba(124, 58, 237, 0.12);
+  animation: dragDropBackdropFade 0.18s ease-out forwards;
 }
 
-.discordDragDropContent {
+.discordDragDropCard {
+  width: 90%;
+  max-width: 440px;
+  background: linear-gradient(180deg, #161b29 0%, #111420 100%);
+  border: 1px solid #28324a;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.04), 0 0 35px rgba(124, 58, 237, 0.15);
+  padding: 16px;
+  animation: dragDropCardPop 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.discordDragDropTarget {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 32px 40px;
-  background: radial-gradient(circle, rgba(124, 58, 237, 0.18) 0%, rgba(17, 21, 33, 0) 70%);
-  border-radius: 16px;
+  padding: 28px 24px 22px;
+  border: 1.5px dashed rgba(124, 58, 237, 0.45);
+  border-radius: 14px;
+  background: radial-gradient(circle at 50% 30%, rgba(124, 58, 237, 0.1) 0%, rgba(17, 20, 32, 0) 75%);
 }
 
 .discordDragDropIconWrap {
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, rgba(124, 58, 237, 0.28), rgba(99, 102, 241, 0.22));
-  border: 1px solid rgba(139, 92, 246, 0.5);
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.25), rgba(88, 101, 242, 0.2));
+  border: 1px solid rgba(139, 92, 246, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   color: #c4b5fd;
-  animation: pulseUploadIcon 1.8s infinite ease-in-out;
-  box-shadow: 0 0 24px rgba(124, 58, 237, 0.45);
+  box-shadow: 0 4px 18px rgba(124, 58, 237, 0.3);
+  animation: dragDropIconHover 2s infinite ease-in-out;
 }
 
-.discordDragDropContent h3 {
-  margin: 0 0 8px;
-  font-size: 19px;
+.discordDragDropTarget h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
   font-weight: 700;
-  color: #f8fafc;
-  letter-spacing: -0.3px;
+  color: #f2f3f5;
+  letter-spacing: -0.2px;
 }
 
-.discordDragDropContent p {
-  margin: 0;
+.dragDropChanBadge {
+  color: #a78bfa;
+  font-weight: 700;
+}
+
+.discordDragDropTarget p {
+  margin: 0 0 16px;
   font-size: 13px;
-  color: #94a3b8;
+  color: #949ba4;
   font-weight: 500;
 }
 
-@keyframes dragDropFadeIn {
+.dragDropPillsRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.dragDropPill {
+  background: #0d1019;
+  border: 1px solid #232b3f;
+  color: #8b95aa;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+@keyframes dragDropBackdropFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dragDropCardPop {
   from {
+    transform: scale(0.94) translateY(6px);
     opacity: 0;
-    transform: scale(0.97);
   }
   to {
+    transform: scale(1) translateY(0);
     opacity: 1;
-    transform: scale(1);
   }
 }
 
-@keyframes pulseUploadIcon {
+@keyframes dragDropIconHover {
   0%, 100% {
-    transform: translateY(0) scale(1);
-    box-shadow: 0 0 20px rgba(124, 58, 237, 0.4);
+    transform: translateY(0);
   }
   50% {
-    transform: translateY(-5px) scale(1.06);
-    box-shadow: 0 8px 30px rgba(124, 58, 237, 0.7);
+    transform: translateY(-3px);
   }
 }
