@@ -114,6 +114,11 @@ app.get('/api/ws', { websocket: true }, (connection, req) => {
           channel_id: Number(data.channelId),
           username: user!.username,
         });
+      } else if (data.event === 'status') {
+        broadcast('user:status', {
+          username: user!.username,
+          status: data.status,
+        });
       }
     } catch {}
   });

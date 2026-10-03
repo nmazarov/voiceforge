@@ -3824,3 +3824,136 @@ body { font-size: 14px; }
 .connectionDoneBtn:hover {
   background: #4752c4;
 }
+
+/* ==========================================================================
+   Discord-style User Presence Statuses (Item 2: Online, Idle, DND, Invisible)
+   ========================================================================== */
+
+.discordUserPanel {
+  position: relative !important;
+}
+
+.discordUserInfo {
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 4px 6px;
+  transition: background 0.15s ease, transform 0.1s ease;
+  user-select: none;
+}
+
+.discordUserInfo:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.discordUserInfo:active {
+  transform: scale(0.98);
+}
+
+.discordOnlineDot {
+  font-size: 13px !important;
+  line-height: 1;
+  transition: color 0.2s ease;
+}
+
+.discordStatusMenuBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 990;
+  background: transparent;
+}
+
+.discordStatusMenu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 8px;
+  width: 250px;
+  background: #11151f;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+  padding: 8px 6px;
+  z-index: 995;
+  animation: statusMenuSlide 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  backdrop-filter: blur(8px);
+}
+
+@keyframes statusMenuSlide {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.statusMenuHeader {
+  padding: 4px 10px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #8e97ac;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  margin-bottom: 4px;
+}
+
+.statusMenuItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.12s ease;
+}
+
+.statusMenuItem:hover {
+  background: #182033;
+}
+
+.statusMenuItem.selected {
+  background: rgba(99, 102, 241, 0.14);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.statusMenuDot {
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.statusMenuText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.statusMenuText b {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f2f3f5;
+  line-height: 1.2;
+}
+
+.statusMenuText small {
+  font-size: 11px;
+  color: #8e97ac;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statusMenuCheck {
+  color: #818cf8;
+  font-size: 13px;
+  font-weight: 800;
+  flex-shrink: 0;
+}

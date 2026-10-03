@@ -123,6 +123,41 @@ const streamQualities: Record<StreamQuality, { label: string; width: number; hei
   "1080p30": { label: "1080p · 30 FPS", width: 1920, height: 1080, frameRate: 30, bitrate: 5_000_000 },
   "1080p60": { label: "1080p · 60 FPS", width: 1920, height: 1080, frameRate: 60, bitrate: 8_000_000 },
 };
+type UserStatus = "online" | "idle" | "dnd" | "invisible";
+
+function getStatusDetails(status: UserStatus = "online", en: boolean = false) {
+  switch (status) {
+    case "idle":
+      return {
+        label: en ? "Idle / AFK" : "Не активен",
+        color: "#f59e0b",
+        icon: "🌙",
+        desc: en ? "Away from keyboard" : "Отошел от компьютера",
+      };
+    case "dnd":
+      return {
+        label: en ? "Do Not Disturb" : "Не беспокоить",
+        color: "#ef4444",
+        icon: "⛔",
+        desc: en ? "Mutes incoming sound notifications" : "Глушит звуки сообщений",
+      };
+    case "invisible":
+      return {
+        label: en ? "Invisible" : "Невидимка",
+        color: "#747f8d",
+        icon: "⚪",
+        desc: en ? "Appear offline to others" : "Отображаться не в сети",
+      };
+    case "online":
+    default:
+      return {
+        label: en ? "Online" : "В сети",
+        color: "#23a55a",
+        icon: "🟢",
+        desc: en ? "Active & receiving notifications" : "Виден всем, звук включен",
+      };
+  }
+}
 type ClientSettings = {
   language: "ru" | "en";
   inputDevice: string;
@@ -193,6 +228,7 @@ const Logo = ({ compact = false }: { compact?: boolean }) => (
 
 let audioContext: AudioContext | undefined;
 let currentSoundSettings = loadSettings();
+let currentMyStatus: UserStatus = "online";
 type SoundName =
   | "click"
   | "success"
@@ -245,7 +281,8 @@ const soundPatterns: Record<SoundName, Array<[number, number, number]>> = {
 function playSound(name: SoundName) {
   if (
     !currentSoundSettings.sounds ||
-    (name === "click" && !currentSoundSettings.clickSounds)
+    (name === "click" && !currentSoundSettings.clickSounds) ||
+    (currentMyStatus === "dnd" && (name === "message" || name === "click"))
   )
     return;
   audioContext ??= new AudioContext();
@@ -509,7 +546,18 @@ function App() {
     [unreadBelowCount, setUnreadBelowCount] = useState(0),
     [isDraggingFile, setIsDraggingFile] = useState(false),
     [searchMatchIndex, setSearchMatchIndex] = useState(0),
-    [connectionInfoOpen, setConnectionInfoOpen] = useState(false);
+    [connectionInfoOpen, setConnectionInfoOpen] = useState(false),
+    [myStatus, setMyStatus] = useState<UserStatus>(() => {
+      try {
+        const saved = localStorage.getItem("vf_user_status") as UserStatus;
+        if (saved && ["online", "idle", "dnd", "invisible"].includes(saved)) return saved;
+        return "online";
+      } catch {
+        return "online";
+      }
+    }),
+    [userStatuses, setUserStatuses] = useState<Record<string, UserStatus>>({}),
+    [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const en = settings.language === "en";
   const mediaRef = useRef<HTMLDivElement>(null),
     deafenedRef = useRef(false),
@@ -524,7 +572,8 @@ function App() {
     lastTypingSentRef = useRef<number>(0),
     messagesContainerRef = useRef<HTMLDivElement>(null),
     isAtBottomRef = useRef(true),
-    dragCounterRef = useRef(0);
+    dragCounterRef = useRef(0),
+    myStatusRef = useRef<UserStatus>(myStatus);
   const headers = {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
@@ -559,6 +608,10 @@ function App() {
     localStorage.setItem("vf_settings", JSON.stringify(settings));
   }, [settings]);
   useEffect(() => {
+    currentMyStatus = myStatus;
+    myStatusRef.current = myStatus;
+  }, [myStatus]);
+  useEffect(() => {
     if (server) void loadChannels();
   }, [server]);
   useEffect(() => {
@@ -590,6 +643,11 @@ function App() {
       try {
         ws = new WebSocket(wsUrl);
         wsRef.current = ws;
+        ws.onopen = () => {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ event: "status", status: myStatusRef.current }));
+          }
+        };
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
@@ -601,7 +659,9 @@ function App() {
                   return [...prev, newMsg];
                 });
                 if (newMsg.username !== usernameRef.current) {
-                  playSound("message");
+                  if (myStatusRef.current !== "dnd") {
+                    playSound("message");
+                  }
                 }
                 if (isAtBottomRef.current) {
                   setTimeout(() => {
@@ -644,6 +704,11 @@ function App() {
               const { channel_id, username: typingUser } = data.payload || {};
               if (activeTextRef.current && channel_id === activeTextRef.current.id && typingUser !== usernameRef.current) {
                 setTypingUsers((prev) => ({ ...prev, [typingUser]: Date.now() + 3500 }));
+              }
+            } else if (data.event === "user:status") {
+              const { username: stUser, status: stStatus } = data.payload || {};
+              if (stUser && stStatus) {
+                setUserStatuses((prev) => ({ ...prev, [stUser]: stStatus }));
               }
             } else if (data.event === "message:reaction") {
               const { messageId, emoji, username: reactingUser } = data.payload;
@@ -1713,6 +1778,18 @@ function App() {
       setSourceLoading(false);
     }
   }
+  function changeStatus(next: UserStatus) {
+    setMyStatus(next);
+    myStatusRef.current = next;
+    currentMyStatus = next;
+    try {
+      localStorage.setItem("vf_user_status", next);
+    } catch {}
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ event: "status", status: next }));
+    }
+    setStatusMenuOpen(false);
+  }
   function logout() {
     void room?.disconnect();
     resetCall();
@@ -2070,12 +2147,51 @@ function App() {
         )}
 
         <div className="discordUserPanel">
+          {statusMenuOpen && (
+            <>
+              <div
+                className="discordStatusMenuBackdrop"
+                onClick={() => setStatusMenuOpen(false)}
+              />
+              <div className="discordStatusMenu" onClick={(e) => e.stopPropagation()}>
+                <div className="statusMenuHeader">
+                  <span>{en ? "SET STATUS" : "УСТАНОВИТЬ СТАТУС"}</span>
+                </div>
+                {(["online", "idle", "dnd", "invisible"] as UserStatus[]).map((st) => {
+                  const details = getStatusDetails(st, en);
+                  const isSelected = myStatus === st;
+                  return (
+                    <button
+                      key={st}
+                      type="button"
+                      className={`statusMenuItem ${isSelected ? "selected" : ""}`}
+                      onClick={() => changeStatus(st)}
+                    >
+                      <span className="statusMenuDot" style={{ color: details.color }}>
+                        ●
+                      </span>
+                      <div className="statusMenuText">
+                        <b>{details.label}</b>
+                        <small>{details.desc}</small>
+                      </div>
+                      {isSelected && <span className="statusMenuCheck">✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
           <div
             className="discordUserInfo"
-            onClick={() => setSettingsOpen(true)}
-            title={en ? "Open Settings" : "Открыть настройки"}
+            onClick={() => setStatusMenuOpen(!statusMenuOpen)}
+            title={en ? "Change Status" : "Сменить статус"}
           >
-            <span className="discordOnlineDot">●</span>
+            <span
+              className="discordOnlineDot"
+              style={{ color: getStatusDetails(myStatus, en).color }}
+            >
+              ●
+            </span>
             <div className="discordUserText">
               <div className="discordUserNameRow">
                 <b
@@ -2092,7 +2208,12 @@ function App() {
                   </span>
                 )}
               </div>
-              <small className="discordSubtext">{en ? "Online" : "В сети"}</small>
+              <small
+                className="discordSubtext"
+                style={{ color: getStatusDetails(myStatus, en).color }}
+              >
+                {getStatusDetails(myStatus, en).label}
+              </small>
             </div>
           </div>
           <div className="discordUserControls">
@@ -2837,7 +2958,10 @@ function App() {
               {g.members.map((participant) => {
                 const uRole = getUserRole(participant);
                 const badge = getRoleBadge(uRole, en);
-                const isOnline = participants.length === 0 || participants.includes(participant);
+                const effectiveStatus: UserStatus = participant === username
+                  ? myStatus
+                  : (userStatuses[participant] || "online");
+                const stDetails = getStatusDetails(effectiveStatus, en);
                 const isSpeaking = Boolean(participantStates[participant]?.speaking);
                 return (
                   <div
@@ -2848,7 +2972,7 @@ function App() {
                   >
                     <span
                       className={`discordMemberStatusDot ${isSpeaking ? "speakingDot" : ""}`}
-                      style={{ color: isSpeaking ? "#23a55a" : isOnline ? "#23a55a" : "#747f8d" }}
+                      style={{ color: isSpeaking ? "#23a55a" : stDetails.color }}
                     >
                       ●
                     </span>
@@ -2872,12 +2996,10 @@ function App() {
                           <span className="speakingSubtext">
                             <MicIcon size={12} className="inlineMicIcon" /> {en ? "Speaking" : "Говорит"}
                           </span>
-                        ) : voice ? (
+                        ) : voice && participants.includes(participant) ? (
                           en ? "In voice channel" : "В голосовом канале"
-                        ) : isOnline ? (
-                          "Online"
                         ) : (
-                          "Offline"
+                          <span style={{ color: stDetails.color }}>{stDetails.label}</span>
                         )}
                         {participant !== username && (userVolumes[participant] ?? 100) !== 100 && (
                           <span className="memberVolTag"> • {userVolumes[participant]}%</span>
