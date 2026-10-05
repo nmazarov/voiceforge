@@ -1915,12 +1915,17 @@ function App() {
       </nav>
       <aside className="sidebar">
         <div className="serverHead">
-          <div>
-            <small>SERVER</small>
+          <div className="headTitleGroup">
             <b>{server.replace(/^https?:\/\//, "") || "VoiceForge"}</b>
+            <small>{en ? "VoiceForge Server" : "Сервер VoiceForge"}</small>
           </div>
-          <button onClick={changeServer} title={en ? "Change server" : "Сменить сервер"}>
-            ⌁
+          <button
+            type="button"
+            className="serverActionBtn"
+            onClick={changeServer}
+            title={en ? "Change server" : "Сменить сервер"}
+          >
+            ⋮
           </button>
         </div>
         <div className="sidebarScrollArea">
@@ -1928,21 +1933,25 @@ function App() {
             className="discordCategoryHead"
             onClick={() => setCollapsedCategories((prev) => ({ ...prev, text: !prev.text }))}
           >
-            <span className={`discordChevron ${collapsedCategories.text ? "collapsed" : ""}`}>▼</span>
-            <span>{en ? "TEXT CHANNELS" : "ТЕКСТОВЫЕ КАНАЛЫ"}</span>
-            <span className="categoryCount">{channels.filter((c) => c.type === "text").length}</span>
-            <button
-              type="button"
-              className="discordCategoryAddBtn"
-              onClick={(e) => {
-                e.stopPropagation();
-                setCreateChannelType("text");
-                setCreateChannelOpen(true);
-              }}
-              title={en ? "Create Text Channel" : "Создать текстовый канал"}
-            >
-              +
-            </button>
+            <div className="categoryTitle">
+              <span className={`discordChevron ${collapsedCategories.text ? "collapsed" : ""}`}>▼</span>
+              <span>{en ? "TEXT CHANNELS" : "ТЕКСТОВЫЕ КАНАЛЫ"}</span>
+            </div>
+            <div className="categoryRight">
+              <span className="categoryCount">{channels.filter((c) => c.type === "text").length}</span>
+              <button
+                type="button"
+                className="discordCategoryAddBtn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCreateChannelType("text");
+                  setCreateChannelOpen(true);
+                }}
+                title={en ? "Create Text Channel" : "Создать текстовый канал"}
+              >
+                +
+              </button>
+            </div>
           </div>
           {!collapsedCategories.text && channels
             .filter((channel) => channel.type === "text")
@@ -1989,21 +1998,25 @@ function App() {
             className="discordCategoryHead"
             onClick={() => setCollapsedCategories((prev) => ({ ...prev, voice: !prev.voice }))}
           >
-            <span className={`discordChevron ${collapsedCategories.voice ? "collapsed" : ""}`}>▼</span>
-            <span>{en ? "VOICE CHANNELS" : "ГОЛОСОВЫЕ КАНАЛЫ"}</span>
-            <span className="categoryCount">{channels.filter((c) => c.type === "voice").length}</span>
-            <button
-              type="button"
-              className="discordCategoryAddBtn"
-              onClick={(e) => {
-                e.stopPropagation();
-                setCreateChannelType("voice");
-                setCreateChannelOpen(true);
-              }}
-              title={en ? "Create Voice Channel" : "Создать голосовой канал"}
-            >
-              +
-            </button>
+            <div className="categoryTitle">
+              <span className={`discordChevron ${collapsedCategories.voice ? "collapsed" : ""}`}>▼</span>
+              <span>{en ? "VOICE CHANNELS" : "ГОЛОСОВЫЕ КАНАЛЫ"}</span>
+            </div>
+            <div className="categoryRight">
+              <span className="categoryCount">{channels.filter((c) => c.type === "voice").length}</span>
+              <button
+                type="button"
+                className="discordCategoryAddBtn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCreateChannelType("voice");
+                  setCreateChannelOpen(true);
+                }}
+                title={en ? "Create Voice Channel" : "Создать голосовой канал"}
+              >
+                +
+              </button>
+            </div>
           </div>
           {!collapsedCategories.voice && channels
             .filter((channel) => channel.type === "voice")
@@ -2251,10 +2264,10 @@ function App() {
       <main className="content">
         <header>
           <div className="title">
-            <i>#</i>
-            <div>
+            <span className="channelHashIcon">#</span>
+            <div className="headTitleGroup">
               <b>{activeText?.name || "general"}</b>
-              <small>VoiceForge Community</small>
+              <small>{en ? "Text Channel" : "Текстовый канал"}</small>
             </div>
           </div>
           <div className="headerBtns">
@@ -2950,74 +2963,91 @@ function App() {
             { title: en ? "MEMBERS" : "УЧАСТНИКИ", members: regular, icon: "👤" },
           ].filter((g) => g.members.length > 0);
 
-          return groups.map((g) => (
-            <React.Fragment key={g.title}>
-              <div className="discordMemberCategoryHead">
-                <span>{g.icon} {g.title} — {g.members.length}</span>
+          return (
+            <>
+              <div className="membersHeader">
+                <div className="headTitleGroup">
+                  <b>{en ? "Members" : "Участники"}</b>
+                  <small>{en ? "Server Roster" : "Список сервера"}</small>
+                </div>
+                <span className="membersCountBadge">{list.length}</span>
               </div>
-              {g.members.map((participant) => {
-                const uRole = getUserRole(participant);
-                const badge = getRoleBadge(uRole, en);
-                const effectiveStatus: UserStatus = participant === username
-                  ? myStatus
-                  : (userStatuses[participant] || "online");
-                const stDetails = getStatusDetails(effectiveStatus, en);
-                const isSpeaking = Boolean(participantStates[participant]?.speaking);
-                return (
-                  <div
-                    className={`discordMemberItem ${participant !== username ? "clickable" : ""} ${isSpeaking ? "speaking" : ""}`}
-                    key={participant}
-                    onClick={() => participant !== username && setVolumeMenuUser(participant)}
-                    title={participant !== username ? (en ? `Volume: ${userVolumes[participant] ?? 100}% (click to adjust)` : `Громкость: ${userVolumes[participant] ?? 100}% (нажмите для настройки)`) : undefined}
-                  >
-                    <span
-                      className={`discordMemberStatusDot ${isSpeaking ? "speakingDot" : ""}`}
-                      style={{ color: isSpeaking ? "#23a55a" : stDetails.color }}
-                    >
-                      ●
-                    </span>
-                    <div className="discordMemberInfo">
-                      <div className="discordMemberNameRow">
-                        <b
-                          className={`discordMemberNameText ${isSpeaking ? "speakingName" : ""}`}
-                          style={{ color: isSpeaking ? "#4ade80" : uRole !== "user" ? badge.color : "#dbdee1" }}
-                        >
-                          {participant}
-                        </b>
-                        <RoleBadge role={uRole} en={en} />
-                        {isSpeaking && (
-                          <span className="speakingWaveMini" title={en ? "Speaking" : "Говорит"}>
-                            <span /><span /><span />
-                          </span>
-                        )}
+              <div className="membersScrollable">
+                {groups.map((g) => (
+                  <React.Fragment key={g.title}>
+                    <div className="discordMemberCategoryHead">
+                      <div className="categoryTitle">
+                        <span className="categoryRoleIcon">{g.icon}</span>
+                        <span>{g.title}</span>
                       </div>
-                      <small className="discordMemberSubtext">
-                        {isSpeaking ? (
-                          <span className="speakingSubtext">
-                            <MicIcon size={12} className="inlineMicIcon" /> {en ? "Speaking" : "Говорит"}
-                          </span>
-                        ) : voice && participants.includes(participant) ? (
-                          en ? "In voice channel" : "В голосовом канале"
-                        ) : (
-                          <span style={{ color: stDetails.color }}>{stDetails.label}</span>
-                        )}
-                        {participant !== username && (userVolumes[participant] ?? 100) !== 100 && (
-                          <span className="memberVolTag"> • {userVolumes[participant]}%</span>
-                        )}
-                      </small>
+                      <span className="categoryCount">{g.members.length}</span>
                     </div>
-                  </div>
-                );
-              })}
-            </React.Fragment>
-          ));
+                    {g.members.map((participant) => {
+                      const uRole = getUserRole(participant);
+                      const badge = getRoleBadge(uRole, en);
+                      const effectiveStatus: UserStatus = participant === username
+                        ? myStatus
+                        : (userStatuses[participant] || "online");
+                      const stDetails = getStatusDetails(effectiveStatus, en);
+                      const isSpeaking = Boolean(participantStates[participant]?.speaking);
+                      return (
+                        <div
+                          className={`discordMemberItem ${participant !== username ? "clickable" : ""} ${isSpeaking ? "speaking" : ""}`}
+                          key={participant}
+                          onClick={() => participant !== username && setVolumeMenuUser(participant)}
+                          title={participant !== username ? (en ? `Volume: ${userVolumes[participant] ?? 100}% (click to adjust)` : `Громкость: ${userVolumes[participant] ?? 100}% (нажмите для настройки)`) : undefined}
+                        >
+                          <span
+                            className={`discordMemberStatusDot ${isSpeaking ? "speakingDot" : ""}`}
+                            style={{ color: isSpeaking ? "#23a55a" : stDetails.color }}
+                          >
+                            ●
+                          </span>
+                          <div className="discordMemberInfo">
+                            <div className="discordMemberNameRow">
+                              <b
+                                className={`discordMemberNameText ${isSpeaking ? "speakingName" : ""}`}
+                                style={{ color: isSpeaking ? "#4ade80" : uRole !== "user" ? badge.color : "#dbdee1" }}
+                              >
+                                {participant}
+                              </b>
+                              <RoleBadge role={uRole} en={en} />
+                              {isSpeaking && (
+                                <span className="speakingWaveMini" title={en ? "Speaking" : "Говорит"}>
+                                  <span /><span /><span />
+                                </span>
+                              )}
+                            </div>
+                            <small className="discordMemberSubtext">
+                              {isSpeaking ? (
+                                <span className="speakingSubtext">
+                                  <MicIcon size={12} className="inlineMicIcon" /> {en ? "Speaking" : "Говорит"}
+                                </span>
+                              ) : voice && participants.includes(participant) ? (
+                                en ? "In voice channel" : "В голосовом канале"
+                              ) : (
+                                <span style={{ color: stDetails.color }}>{stDetails.label}</span>
+                              )}
+                              {participant !== username && (userVolumes[participant] ?? 100) !== 100 && (
+                                <span className="memberVolTag"> • {userVolumes[participant]}%</span>
+                              )}
+                            </small>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </React.Fragment>
+                ))}
+              </div>
+            </>
+          );
         })()}
-        <div className="node">
-          <small>VOICEFORGE NODE</small>
-          <b>Self-hosted</b>
-          <span>
-            {platform === "linux" ? "Linux Client" : "Windows Client"}
-          </span>
+        <div className="membersFooter">
+          <div className="headTitleGroup">
+            <b>VoiceForge Node</b>
+            <small>{platform === "linux" ? "Linux Client" : "Windows Client"}</small>
+          </div>
+          <span className="nodeOnlinePill">Online</span>
         </div>
       </aside>
       {volumeMenuUser && (

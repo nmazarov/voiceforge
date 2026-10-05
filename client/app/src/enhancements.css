@@ -3957,3 +3957,402 @@ body { font-size: 14px; }
   font-weight: 800;
   flex-shrink: 0;
 }
+
+/* ==========================================================================
+   Full UI Alignment & Uniform Obsidian Design System (Strict Geometry)
+   ========================================================================== */
+
+/* 1. Global Shell & Layout Grid */
+.shell {
+  display: grid !important;
+  grid-template-columns: 72px 260px 1fr 260px !important;
+  height: 100vh !important;
+  overflow: hidden !important;
+  background: #0b0e14 !important;
+}
+
+/* 2. Strict 56px Top Header Alignment Across All Columns */
+.serverHead,
+.content > header,
+.membersHeader {
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
+  box-sizing: border-box !important;
+  padding: 0 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  background: #0d111a !important;
+  border-bottom: 1px solid #1a2030 !important;
+  margin: 0 !important;
+}
+
+.headTitleGroup {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  min-width: 0 !important;
+}
+
+.headTitleGroup b {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: #f2f3f5 !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.headTitleGroup small {
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  color: #8e97ac !important;
+  line-height: 1.2 !important;
+  margin-top: 1px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.channelHashIcon {
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  color: #8e97ac !important;
+  margin-right: 8px !important;
+  line-height: 1 !important;
+}
+
+.content > header .title {
+  display: flex !important;
+  align-items: center !important;
+  min-width: 0 !important;
+}
+
+/* 3. Strict 56px Bottom Footer Alignment Across All Columns */
+.discordUserPanel,
+.discordComposerContainer,
+.membersFooter {
+  height: 56px !important;
+  min-height: 56px !important;
+  max-height: 56px !important;
+  box-sizing: border-box !important;
+  border-top: 1px solid #1a2030 !important;
+  background: #0a0d14 !important;
+}
+
+.discordUserPanel {
+  padding: 0 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.discordComposerContainer {
+  margin: 0 !important;
+  padding: 0 16px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.discordComposerContainer .composer {
+  height: 38px !important;
+  min-height: 38px !important;
+  max-height: 38px !important;
+  width: 100% !important;
+  background: #131722 !important;
+  border: 1px solid #232b3e !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 8px !important;
+  gap: 8px !important;
+  box-sizing: border-box !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+.discordComposerContainer .composer:focus-within {
+  border-color: #5865f2 !important;
+  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.2) !important;
+}
+
+.membersFooter {
+  padding: 0 16px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.nodeOnlinePill {
+  background: rgba(35, 165, 90, 0.15) !important;
+  border: 1px solid rgba(35, 165, 90, 0.3) !important;
+  color: #4ade80 !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  padding: 2px 7px !important;
+  border-radius: 6px !important;
+}
+
+/* 4. Column Containers (Sidebar, Chat, Members) */
+.sidebar {
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 0 !important;
+  background: #0d111a !important;
+  border-right: 1px solid #1a2030 !important;
+  overflow: hidden !important;
+}
+
+.sidebarScrollArea,
+.channels {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  padding: 10px 6px !important;
+}
+
+.members {
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 0 !important;
+  background: #0d111a !important;
+  border-left: 1px solid #1a2030 !important;
+  overflow: hidden !important;
+}
+
+.membersScrollable {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  padding: 10px 6px !important;
+}
+
+/* 5. Category Headers & Badges */
+.categoryHeader,
+.discordCategoryHead,
+.discordMemberCategoryHead {
+  height: 30px !important;
+  min-height: 30px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 10px !important;
+  margin: 12px 6px 4px !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.04em !important;
+  color: #8e97ac !important;
+  text-transform: uppercase !important;
+  user-select: none !important;
+  box-sizing: border-box !important;
+}
+
+.categoryTitle {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.categoryRight {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.categoryRoleIcon {
+  font-size: 12px !important;
+}
+
+.categoryCount,
+.membersCountBadge {
+  background: #182033 !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  color: #949ba4 !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  padding: 1px 7px !important;
+  border-radius: 8px !important;
+  line-height: 1.2 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* 6. List Items (Channels, Voice Users & Members) */
+.discordChannelRow {
+  position: relative !important;
+  margin: 1px 6px !important;
+}
+
+.discordChannelBtn {
+  height: 34px !important;
+  padding: 0 10px !important;
+  border-radius: 6px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #949ba4 !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  width: 100% !important;
+  cursor: pointer !important;
+  transition: all 0.12s ease !important;
+  box-sizing: border-box !important;
+}
+
+.discordChannelBtn:hover {
+  background: #141926 !important;
+  color: #dbdee1 !important;
+}
+
+.discordChannelBtn.active {
+  background: #1b2133 !important;
+  color: #f2f3f5 !important;
+  border-left: 2px solid #5865f2 !important;
+}
+
+.discordChannelUsers {
+  margin: 2px 6px 6px 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+.discordChannelUserRow {
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 8px !important;
+  border-radius: 6px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  transition: all 0.12s ease !important;
+  box-sizing: border-box !important;
+}
+
+.discordChannelUserRow .userNameText {
+  flex: 1 !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: #dbdee1 !important;
+  text-align: left !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.discordChannelUserRow.speaking {
+  background: rgba(35, 165, 90, 0.08) !important;
+  border: 1px solid rgba(35, 165, 90, 0.35) !important;
+  color: #4ade80 !important;
+}
+
+.discordMemberItem {
+  height: 42px !important;
+  min-height: 42px !important;
+  padding: 0 10px !important;
+  border-radius: 6px !important;
+  margin: 1px 6px !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  cursor: pointer !important;
+  transition: all 0.12s ease !important;
+  box-sizing: border-box !important;
+}
+
+.discordMemberItem:hover {
+  background: #141926 !important;
+}
+
+.discordMemberItem.speaking {
+  background: rgba(35, 165, 90, 0.08) !important;
+  border: 1px solid rgba(35, 165, 90, 0.35) !important;
+}
+
+.discordMemberInfo {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  min-width: 0 !important;
+  flex: 1 !important;
+}
+
+.discordMemberNameRow {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.discordMemberNameText {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  line-height: 1.25 !important;
+}
+
+.discordMemberSubtext {
+  font-size: 11px !important;
+  line-height: 1.25 !important;
+  color: #8e97ac !important;
+  margin-top: 1px !important;
+}
+
+/* 7. Header Buttons & Controls Alignment */
+.serverActionBtn,
+.headerBtns button {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  border-radius: 8px !important;
+  border: 1px solid #242b3f !important;
+  background: #141824 !important;
+  color: #8e97ac !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  font-size: 15px !important;
+  transition: all 0.15s ease !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.serverActionBtn:hover,
+.headerBtns button:hover {
+  background: #1d2335 !important;
+  border-color: #3b82f6 !important;
+  color: #f2f3f5 !important;
+}
+
+.headerBtns {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.headerPingBadge {
+  height: 32px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 0 10px !important;
+  border-radius: 8px !important;
+  border: 1px solid #242b3f !important;
+  background: #141824 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #949ba4 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.headerPingBadge:hover {
+  background: #1d2335 !important;
+  border-color: #3b82f6 !important;
+  color: #f2f3f5 !important;
+}
