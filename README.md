@@ -4,6 +4,16 @@
 
 ---
 
+## 📥 Скачать клиент VoiceForge
+
+| Платформа | Формат | Ссылка на скачивание |
+| :--- | :--- | :--- |
+| **🪟 Windows 10 / 11** | Инсталлятор (`.exe`) | **[⬇️ Скачать VoiceForge для Windows (Setup .exe)](https://github.com/nmazarov/voiceforge/releases/download/v1.1.0/VoiceForge-Setup-1.1.0.exe)** |
+| **🐧 Linux (Все дистрибутивы)** | AppImage / Deb | **[📦 Релизы VoiceForge для Linux](https://github.com/nmazarov/voiceforge/releases/latest)** |
+| **🌐 Все версии** | GitHub Releases | **[🚀 Страница всех релизов](https://github.com/nmazarov/voiceforge/releases)** |
+
+---
+
 ## ⚡ Быстрый старт: Запуск сервера в 1 команду
 
 Для запуска серверной части на любом чистом VPS (Ubuntu / Debian) достаточно выполнить одну команду:

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec "$ROOT/scripts/voiceforge-manager.sh" "$@"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+exec "$SCRIPT_DIR/scripts/voiceforge-manager.sh" "$@"
