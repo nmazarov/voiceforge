@@ -110,8 +110,8 @@ type ParticipantState = { mic: boolean; speaking: boolean };
 type RemoteStreamState = {
   id: string;
   name: string;
-  video?: RemoteTrack;
-  audio?: RemoteTrack;
+  video?: Track;
+  audio?: Track;
   watching: boolean;
 };
 type CallStatus = "idle" | "connecting" | "connected" | "reconnecting";
@@ -328,12 +328,14 @@ function StreamPreview({
   subtitle,
   open,
   onToggle,
+  onPopout,
 }: {
   track: LocalTrack;
   title: string;
   subtitle: string;
   open: boolean;
   onToggle: () => void;
+  onPopout?: () => void;
 }) {
   const previewRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -353,10 +355,244 @@ function StreamPreview({
       <div className="streamPreviewHead">
         <span><i />{title}</span>
         <small>{subtitle}</small>
-        <button onClick={onToggle}>{open ? "−" : "□"}</button>
+        <div style={{ display: "inline-flex", gap: "6px", alignItems: "center", marginLeft: "auto" }}>
+          {onPopout && (
+            <button
+              type="button"
+              onClick={onPopout}
+              title="Открыть в подвижном / отдельном окне"
+              style={{ fontSize: "11px", padding: "2px 5px", cursor: "pointer" }}
+            >
+              🗗
+            </button>
+          )}
+          <button onClick={onToggle}>{open ? "−" : "□"}</button>
+        </div>
       </div>
       {open && <div className="streamPreviewViewport" ref={previewRef} />}
     </section>
+  );
+}
+
+function FloatingStreamViewer({
+  stream,
+  onClose,
+  en,
+  deafened,
+  masterVolume,
+}: {
+  stream: RemoteStreamState;
+  onClose: () => void;
+  en: boolean;
+  deafened: boolean;
+  masterVolume: number;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+
+  const [pos, setPos] = useState({ x: 320, y: 70 });
+  const [size, setSize] = useState({ width: 720, height: 440 });
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [streamVolume, setStreamVolume] = useState(100);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+
+  const dragStartRef = useRef({ mouseX: 0, mouseY: 0, posX: 0, posY: 0 });
+  const resizeStartRef = useRef({ mouseX: 0, mouseY: 0, width: 0, height: 0 });
+
+  useEffect(() => {
+    if (!stream.video || !videoRef.current) return;
+    const el = videoRef.current;
+    stream.video.attach(el);
+    return () => {
+      stream.video?.detach(el);
+    };
+  }, [stream.video]);
+
+  useEffect(() => {
+    if (!stream.audio || !audioRef.current) return;
+    const el = audioRef.current;
+    stream.audio.attach(el);
+    el.muted = deafened;
+    el.volume = Math.max(0, Math.min(1, (masterVolume / 100) * (streamVolume / 100)));
+    return () => {
+      stream.audio?.detach(el);
+    };
+  }, [stream.audio, deafened, masterVolume, streamVolume]);
+
+  useEffect(() => {
+    const onFsChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
+  const handleMouseDownHeader = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("button") || (e.target as HTMLElement).closest("input")) return;
+    setIsDragging(true);
+    dragStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      posX: pos.x,
+      posY: pos.y,
+    };
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+    const onMouseMove = (e: MouseEvent) => {
+      const dx = e.clientX - dragStartRef.current.mouseX;
+      const dy = e.clientY - dragStartRef.current.mouseY;
+      const maxX = Math.max(0, window.innerWidth - 200);
+      const maxY = Math.max(0, window.innerHeight - 80);
+      setPos({
+        x: Math.max(0, Math.min(maxX, dragStartRef.current.posX + dx)),
+        y: Math.max(0, Math.min(maxY, dragStartRef.current.posY + dy)),
+      });
+    };
+    const onMouseUp = () => setIsDragging(false);
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [isDragging]);
+
+  const handleMouseDownResize = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setIsResizing(true);
+    resizeStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      width: size.width,
+      height: size.height,
+    };
+  };
+
+  useEffect(() => {
+    if (!isResizing) return;
+    const onMouseMove = (e: MouseEvent) => {
+      const dx = e.clientX - resizeStartRef.current.mouseX;
+      const dy = e.clientY - resizeStartRef.current.mouseY;
+      const newWidth = Math.max(340, Math.min(window.innerWidth - pos.x, resizeStartRef.current.width + dx));
+      const newHeight = Math.max(220, Math.min(window.innerHeight - pos.y, resizeStartRef.current.height + dy));
+      setSize({ width: newWidth, height: newHeight });
+    };
+    const onMouseUp = () => setIsResizing(false);
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [isResizing, pos.x, pos.y]);
+
+  const toggleFullscreen = async () => {
+    if (!containerRef.current) return;
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+      } else {
+        await containerRef.current.requestFullscreen();
+        setIsFullscreen(true);
+      }
+    } catch {
+      setIsFullscreen(!isFullscreen);
+    }
+  };
+
+  const handlePopout = async () => {
+    if (!videoRef.current) return;
+    try {
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else if (videoRef.current.requestPictureInPicture) {
+        await videoRef.current.requestPictureInPicture();
+      }
+    } catch (e) {
+      console.warn("Picture-in-picture unavailable:", e);
+    }
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className={`floatingStreamWindow ${isFullscreen ? "fullscreenMode" : ""}`}
+      style={isFullscreen ? undefined : {
+        transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`,
+        width: `${size.width}px`,
+        height: `${size.height}px`,
+      }}
+    >
+      <div className="streamWindowHeader" onMouseDown={handleMouseDownHeader}>
+        <div className="streamHeaderLeft">
+          <span className="liveBadgePulse">
+            <span className="liveDot" />
+            LIVE
+          </span>
+          <b>{stream.name}</b>
+          <small>{en ? "Screen Share" : "Трансляция"}</small>
+        </div>
+        <div className="streamHeaderRight">
+          {stream.audio && (
+            <div className="streamVolumeControl" title={en ? "Stream volume" : "Громкость трансляции"}>
+              <VolumeUpIcon size={14} />
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={streamVolume}
+                onChange={(e) => setStreamVolume(Number(e.target.value))}
+              />
+              <span>{streamVolume}%</span>
+            </div>
+          )}
+          <button
+            type="button"
+            className="streamHeaderBtn"
+            onClick={handlePopout}
+            title={en ? "Pop out to separate window (Picture-in-Picture)" : "Открыть в отдельном окне (Picture-in-Picture)"}
+          >
+            🗗
+          </button>
+          <button
+            type="button"
+            className="streamHeaderBtn"
+            onClick={toggleFullscreen}
+            title={en ? "Toggle Fullscreen (or double-click video)" : "На весь экран (или двойной щелчок)"}
+          >
+            {isFullscreen ? "🗗" : "⛶"}
+          </button>
+          <button
+            type="button"
+            className="streamHeaderBtn close"
+            onClick={onClose}
+            title={en ? "Close stream" : "Закрыть просмотр"}
+          >
+            ✕
+          </button>
+        </div>
+      </div>
+      <div
+        className="streamVideoViewport"
+        onDoubleClick={toggleFullscreen}
+      >
+        <video ref={videoRef} autoPlay playsInline />
+        <audio ref={audioRef} autoPlay />
+      </div>
+      {!isFullscreen && (
+        <div
+          className="streamResizeHandle"
+          onMouseDown={handleMouseDownResize}
+          title={en ? "Drag to resize" : "Потяните, чтобы изменить размер"}
+        />
+      )}
+    </div>
   );
 }
 
@@ -509,6 +745,7 @@ function App() {
     [streamSource, setStreamSource] = useState(""),
     [streamQuality, setStreamQuality] = useState<StreamQuality>("1080p30"),
     [previewOpen, setPreviewOpen] = useState(true),
+    [localPreviewFloating, setLocalPreviewFloating] = useState(false),
     [localStreamTrack, setLocalStreamTrack] = useState<LocalTrack | null>(null),
     [connectError, setConnectError] = useState(false);
   const [sources, setSources] = useState<DesktopSource[]>([]),
@@ -560,6 +797,7 @@ function App() {
     [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const en = settings.language === "en";
   const mediaRef = useRef<HTMLDivElement>(null),
+    mutedRef = useRef(false),
     deafenedRef = useRef(false),
     joiningRef = useRef(false),
     muteBeforeDeafenRef = useRef(false),
@@ -600,6 +838,9 @@ function App() {
   useEffect(() => {
     usernameRef.current = username;
   }, [username]);
+  useEffect(() => {
+    mutedRef.current = muted;
+  }, [muted]);
   useEffect(() => {
     deafenedRef.current = deafened;
   }, [deafened]);
@@ -1159,8 +1400,6 @@ function App() {
       });
       return [];
     });
-    setMuted(false);
-    setDeafened(false);
     setSharing(false);
     setCallStatus("idle");
     setStreamStatus("idle");
@@ -1172,6 +1411,9 @@ function App() {
       noiseGateRef.current = null;
     }
     if (mediaRef.current) mediaRef.current.innerHTML = "";
+    document
+      .querySelectorAll<HTMLMediaElement>('[data-voiceforge-audio="true"]')
+      .forEach((element) => element.remove());
   }
   async function auth(
     mode: "login" | "register",
@@ -1360,51 +1602,61 @@ function App() {
       analyser.fftSize = 512;
       source.connect(analyser);
 
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      const dataArray = new Float32Array(analyser.fftSize);
       let animationId = 0;
       let speakingUntil = 0;
-      let isTrackEnabled = true;
 
       const check = () => {
         if (audioCtx.state === "suspended") void audioCtx.resume();
-        analyser.getByteTimeDomainData(dataArray);
+        analyser.getFloatTimeDomainData(dataArray);
         let sum = 0;
         for (let i = 0; i < dataArray.length; i++) {
-          const val = (dataArray[i] - 128) / 128;
-          sum += val * val;
+          sum += dataArray[i] * dataArray[i];
         }
         const rms = Math.sqrt(sum / dataArray.length);
-        const volume = Math.min(100, rms * 260 * (currentSettings.inputVolume / 100));
+        let volume = 0;
+        if (rms > 0.0001) {
+          const dB = 20 * Math.log10(rms);
+          volume = Math.max(0, Math.min(100, ((dB + 55) / 45) * 100)) * (currentSettings.inputVolume / 100);
+        }
         const threshold = currentSettings.autoThreshold ? 15 : currentSettings.voiceThreshold;
 
         const isSpeakingNow = volume >= threshold;
         const now = Date.now();
-        if (isSpeakingNow) {
-          speakingUntil = now + 350;
-          if (!isTrackEnabled && !deafenedRef.current) {
-            isTrackEnabled = true;
-            mediaStreamTrack.enabled = true;
-          }
-          if (username) {
+        const myName = usernameRef.current || username;
+
+        if (mutedRef.current || deafenedRef.current) {
+          if (myName) {
             setParticipantStates((current) => {
-              if (current[username]?.speaking) return current;
+              if (!current[myName]?.speaking && !current[myName]?.mic) return current;
               return {
                 ...current,
-                [username]: { mic: !muted, speaking: true },
+                [myName]: { mic: false, speaking: false },
+              };
+            });
+          }
+          animationId = requestAnimationFrame(check);
+          return;
+        }
+
+        if (isSpeakingNow) {
+          speakingUntil = now + 350;
+          if (myName) {
+            setParticipantStates((current) => {
+              if (current[myName]?.speaking && current[myName]?.mic) return current;
+              return {
+                ...current,
+                [myName]: { mic: true, speaking: true },
               };
             });
           }
         } else if (now > speakingUntil) {
-          if (isTrackEnabled) {
-            isTrackEnabled = false;
-            mediaStreamTrack.enabled = false;
-          }
-          if (username) {
+          if (myName) {
             setParticipantStates((current) => {
-              if (!current[username]?.speaking) return current;
+              if (!current[myName]?.speaking && current[myName]?.mic) return current;
               return {
                 ...current,
-                [username]: { mic: current[username]?.mic ?? !muted, speaking: false },
+                [myName]: { mic: true, speaking: false },
               };
             });
           }
@@ -1418,7 +1670,6 @@ function App() {
         stop: () => {
           cancelAnimationFrame(animationId);
           void audioCtx.close();
-          if (mediaStreamTrack) mediaStreamTrack.enabled = true;
         },
       };
     } catch {}
@@ -1466,7 +1717,6 @@ function App() {
             audio: track.source === Track.Source.ScreenShareAudio ? track : existing?.audio,
             watching: existing?.watching || false,
           };
-          if (nextStream.watching) attachRemoteStream(nextStream);
           return existing
             ? current.map((stream) => (stream.id === id ? nextStream : stream))
             : [...current, nextStream];
@@ -1539,18 +1789,28 @@ function App() {
       setRoom(next);
       setVoice(name);
       setCallStatus("connected");
+      const shouldEnableMic = !mutedRef.current && !deafenedRef.current;
       try {
-        await next.localParticipant.setMicrophoneEnabled(true, {
-          deviceId: settings.inputDevice,
-          noiseSuppression: settings.noiseSuppression,
-          echoCancellation: settings.echoCancellation,
-          autoGainControl: settings.autoGainControl,
-        });
-        setMuted(false);
+        if (shouldEnableMic) {
+          await next.localParticipant.setMicrophoneEnabled(true, {
+            deviceId: settings.inputDevice && settings.inputDevice !== "default" ? settings.inputDevice : undefined,
+            noiseSuppression: settings.noiseSuppression,
+            echoCancellation: settings.echoCancellation,
+            autoGainControl: settings.autoGainControl,
+          });
+          startVoiceActivityGate(next, settings);
+        } else {
+          await next.localParticipant.setMicrophoneEnabled(false);
+          const micPub = next.localParticipant.getTrackPublication(Track.Source.Microphone);
+          if (micPub?.track?.mediaStreamTrack) {
+            micPub.track.mediaStreamTrack.enabled = false;
+          }
+          await micPub?.mute().catch(() => {});
+        }
         refresh();
-        startVoiceActivityGate(next, settings);
       } catch (microphoneError) {
         setMuted(true);
+        mutedRef.current = true;
         refresh();
         setNotice(
           settings.language === "en"
@@ -1600,97 +1860,132 @@ function App() {
     playSound("leave");
   }
   async function toggleMute() {
-    if (!room) return;
     if (deafened) {
       setNotice(en ? "Enable sound before turning on the microphone" : "Сначала включите звук, чтобы включить микрофон");
       return;
     }
-    try {
-      await room.localParticipant.setMicrophoneEnabled(muted);
-      setMuted(!muted);
+    const nextMuted = !muted;
+    setMuted(nextMuted);
+    mutedRef.current = nextMuted;
+    playSound(nextMuted ? "mute" : "unmute");
+
+    if (username) {
       setParticipantStates((current) => ({
         ...current,
-        [username]: { mic: muted, speaking: false },
+        [username]: { mic: !nextMuted, speaking: false },
       }));
-      playSound(muted ? "unmute" : "mute");
-    } catch {
-      playSound("error");
-      setNotice(en ? "Could not switch the microphone" : "Не удалось переключить микрофон");
+    }
+
+    if (room) {
+      try {
+        const audioPubs = Array.from(room.localParticipant.audioTrackPublications.values());
+        for (const pub of audioPubs) {
+          if (pub.track?.mediaStreamTrack) {
+            pub.track.mediaStreamTrack.enabled = !nextMuted;
+          }
+          if (nextMuted) {
+            await pub.mute().catch(() => {});
+          } else {
+            await pub.unmute().catch(() => {});
+          }
+        }
+        await room.localParticipant.setMicrophoneEnabled(!nextMuted, {
+          deviceId: settings.inputDevice && settings.inputDevice !== "default" ? settings.inputDevice : undefined,
+          noiseSuppression: settings.noiseSuppression,
+          echoCancellation: settings.echoCancellation,
+          autoGainControl: settings.autoGainControl,
+        }).catch(() => {});
+
+        if (nextMuted) {
+          if (noiseGateRef.current) {
+            noiseGateRef.current.stop();
+            noiseGateRef.current = null;
+          }
+        } else {
+          startVoiceActivityGate(room, settings);
+        }
+      } catch (err) {
+        console.warn("toggleMute room sync error:", err);
+      }
     }
   }
   async function toggleDeafen() {
-    const next = !deafened;
-    if (!room) return;
-    try {
-      if (next) {
-        muteBeforeDeafenRef.current = muted;
-        await room.localParticipant.setMicrophoneEnabled(false);
-        setMuted(true);
+    const nextDeafened = !deafened;
+    setDeafened(nextDeafened);
+    deafenedRef.current = nextDeafened;
+    playSound(nextDeafened ? "mute" : "unmute");
+
+    // Immediately mute/unmute all incoming audio elements from participants and screen shares
+    document
+      .querySelectorAll<HTMLMediaElement>('[data-voiceforge-audio="true"]')
+      .forEach((element) => {
+        element.muted = nextDeafened;
+      });
+
+    if (nextDeafened) {
+      // Deafening automatically mutes microphone as well
+      muteBeforeDeafenRef.current = muted;
+      setMuted(true);
+      mutedRef.current = true;
+      if (username) {
         setParticipantStates((current) => ({
           ...current,
           [username]: { mic: false, speaking: false },
         }));
-      } else if (!muteBeforeDeafenRef.current) {
-        await room.localParticipant.setMicrophoneEnabled(true, {
-          deviceId: settings.inputDevice,
-          noiseSuppression: settings.noiseSuppression,
-          echoCancellation: settings.echoCancellation,
-          autoGainControl: settings.autoGainControl,
-        });
-        setMuted(false);
-        setParticipantStates((current) => ({
-          ...current,
-          [username]: { mic: true, speaking: false },
-        }));
       }
-    } catch {
-      playSound("error");
-      setNotice(en ? "Could not change sound mode" : "Не удалось изменить режим звука");
-      return;
-    }
-    document
-      .querySelectorAll<HTMLMediaElement>('[data-voiceforge-audio="true"]')
-      .forEach((element) => {
-        element.muted = next;
-      });
-    setDeafened(next);
-    playSound(next ? "mute" : "unmute");
-  }
-  function attachRemoteStream(stream: RemoteStreamState) {
-    if (stream.video) {
-      const video = stream.video.attach();
-      video.dataset.voiceforgeStream = stream.id;
-      video.title = en ? "Double-click for fullscreen" : "Двойной щелчок — на весь экран";
-      video.ondblclick = () => void video.requestFullscreen();
-      mediaRef.current?.appendChild(video);
-    }
-    if (stream.audio) {
-      const audio = stream.audio.attach();
-      audio.dataset.voiceforgeAudio = "true";
-      audio.dataset.voiceforgeStream = stream.id;
-      audio.muted = deafenedRef.current;
-      audio.volume = settings.outputVolume / 100;
-      document.body.appendChild(audio);
-    }
-  }
-  async function fullscreenRemoteStream(id: string) {
-    const video = document.querySelector<HTMLVideoElement>(`video[data-voiceforge-stream="${CSS.escape(id)}"]`);
-    if (!video) return;
-    try {
-      await video.requestFullscreen();
-    } catch {
-      setNotice(en ? "Fullscreen mode is unavailable" : "Полноэкранный режим недоступен");
+      if (room) {
+        if (noiseGateRef.current) {
+          noiseGateRef.current.stop();
+          noiseGateRef.current = null;
+        }
+        const audioPubs = Array.from(room.localParticipant.audioTrackPublications.values());
+        for (const pub of audioPubs) {
+          if (pub.track?.mediaStreamTrack) pub.track.mediaStreamTrack.enabled = false;
+          await pub.mute().catch(() => {});
+        }
+        await room.localParticipant.setMicrophoneEnabled(false).catch(() => {});
+      }
+    } else {
+      // Undeafening restores microphone if it was NOT muted prior to deafening
+      const shouldUnmuteMic = !muteBeforeDeafenRef.current;
+      if (shouldUnmuteMic) {
+        setMuted(false);
+        mutedRef.current = false;
+        if (username) {
+          setParticipantStates((current) => ({
+            ...current,
+            [username]: { mic: true, speaking: false },
+          }));
+        }
+        if (room) {
+          await room.localParticipant.setMicrophoneEnabled(true, {
+            deviceId: settings.inputDevice && settings.inputDevice !== "default" ? settings.inputDevice : undefined,
+            noiseSuppression: settings.noiseSuppression,
+            echoCancellation: settings.echoCancellation,
+            autoGainControl: settings.autoGainControl,
+          }).catch(() => {});
+          const audioPubs = Array.from(room.localParticipant.audioTrackPublications.values());
+          for (const pub of audioPubs) {
+            if (pub.track?.mediaStreamTrack) {
+              pub.track.mediaStreamTrack.enabled = true;
+            }
+            await pub.unmute().catch(() => {});
+          }
+          startVoiceActivityGate(room, settings);
+        }
+      } else {
+        setMuted(true);
+        mutedRef.current = true;
+        if (username) {
+          setParticipantStates((current) => ({
+            ...current,
+            [username]: { mic: false, speaking: false },
+          }));
+        }
+      }
     }
   }
   function toggleRemoteStream(id: string) {
-    const target = remoteStreams.find((stream) => stream.id === id);
-    if (!target) return;
-    if (target.watching) {
-      target.video?.detach().forEach((element) => element.remove());
-      target.audio?.detach().forEach((element) => element.remove());
-    } else {
-      attachRemoteStream(target);
-    }
     setRemoteStreams((current) =>
       current.map((stream) =>
         stream.id === id ? { ...stream, watching: !stream.watching } : stream,
@@ -1821,6 +2116,10 @@ function App() {
   async function applySettings(next: ClientSettings) {
     setSettings(next);
     currentSoundSettings = next;
+    try {
+      localStorage.setItem("vf_settings", JSON.stringify(next));
+    } catch {}
+
     document
       .querySelectorAll<HTMLMediaElement>('[data-voiceforge-audio="true"]')
       .forEach((element) => {
@@ -1828,29 +2127,36 @@ function App() {
         const userVol = pName ? ((userVolumes[pName] ?? 100) / 100) : 1;
         element.volume = Math.max(0, Math.min(1, (next.outputVolume / 100) * userVol));
       });
+
     if (room) {
       try {
-        if (next.outputDevice)
+        if (next.outputDevice && next.outputDevice !== "default") {
           await room.switchActiveDevice(
             "audiooutput",
             next.outputDevice,
             false,
-          );
-        await room.localParticipant.setMicrophoneEnabled(false);
-        await room.localParticipant.setMicrophoneEnabled(true, {
-          deviceId: next.inputDevice,
-          noiseSuppression: next.noiseSuppression,
-          echoCancellation: next.echoCancellation,
-          autoGainControl: next.autoGainControl,
-          ...({ volume: next.inputVolume / 100 } as any),
-        });
-        setMuted(false);
-        startVoiceActivityGate(room, next);
-      } catch {
-        setNotice(
-          en ? "Some device settings will apply the next time you join a channel" : "Часть настроек устройства применится при следующем входе в канал",
-        );
-        playSound("error");
+          ).catch(() => {});
+        }
+        const shouldEnableMic = !mutedRef.current && !deafenedRef.current;
+        if (shouldEnableMic) {
+          await room.localParticipant.setMicrophoneEnabled(false).catch(() => {});
+          await room.localParticipant.setMicrophoneEnabled(true, {
+            deviceId: next.inputDevice && next.inputDevice !== "default" ? next.inputDevice : undefined,
+            noiseSuppression: next.noiseSuppression,
+            echoCancellation: next.echoCancellation,
+            autoGainControl: next.autoGainControl,
+          });
+          startVoiceActivityGate(room, next);
+        } else {
+          await room.localParticipant.setMicrophoneEnabled(false).catch(() => {});
+          const micPub = room.localParticipant.getTrackPublication(Track.Source.Microphone);
+          if (micPub?.track?.mediaStreamTrack) {
+            micPub.track.mediaStreamTrack.enabled = false;
+          }
+          await micPub?.mute().catch(() => {});
+        }
+      } catch (err) {
+        console.warn("Device switch error:", err);
       }
     }
     playSound("success");
@@ -2505,6 +2811,7 @@ function App() {
                 subtitle={`${streamSource || (en ? "Screen sharing" : "Демонстрация экрана")} · ${streamQualities[streamQuality].label}`}
                 open={previewOpen}
                 onToggle={() => setPreviewOpen((current) => !current)}
+                onPopout={() => setLocalPreviewFloating(true)}
               />
             )}
             {remoteStreams.some((stream) => stream.video) && (
@@ -2520,14 +2827,9 @@ function App() {
                     </div>
                     <button onClick={() => toggleRemoteStream(stream.id)}>
                       {stream.watching
-                        ? en ? "Stop watching" : "Закрыть трансляцию"
-                        : en ? "Watch stream" : "Смотреть трансляцию"}
+                        ? en ? "Close window" : "Закрыть окно"
+                        : en ? "Watch in window" : "Смотреть в окне"}
                     </button>
-                    {stream.watching && (
-                      <button className="fullscreenStream" onClick={() => void fullscreenRemoteStream(stream.id)}>
-                        ⛶ {en ? "Fullscreen" : "На весь экран"}
-                      </button>
-                    )}
                   </div>
                 ))}
               </div>
@@ -3402,6 +3704,33 @@ function App() {
           onClose={() => setConnectionInfoOpen(false)}
         />
       )}
+      {remoteStreams
+        .filter((stream) => stream.watching && stream.video)
+        .map((stream) => (
+          <FloatingStreamViewer
+            key={stream.id}
+            stream={stream}
+            onClose={() => toggleRemoteStream(stream.id)}
+            en={en}
+            deafened={deafened}
+            masterVolume={settings.outputVolume}
+          />
+        ))}
+      {streamStatus === "live" && localStreamTrack && localPreviewFloating && (
+        <FloatingStreamViewer
+          key="local-stream-preview"
+          stream={{
+            id: "local-stream-preview",
+            name: `${username} (${en ? "You" : "Вы"})`,
+            video: localStreamTrack,
+            watching: true,
+          }}
+          onClose={() => setLocalPreviewFloating(false)}
+          en={en}
+          deafened={true}
+          masterVolume={0}
+        />
+      )}
       <Toast text={notice} />
     </div>
   );
@@ -3557,7 +3886,7 @@ function ConnectionInfoModal({
             <span className="connectionInfoIcon">📡</span>
             <div>
               <h3>{en ? "Connection & Voice Diagnostics" : "Сведения о соединении"}</h3>
-              <small>{en ? "TeamSpeak & Discord RTC Status" : "Сетевая статистика и параметры WebRTC"}</small>
+              <small>{en ? "VoiceForge RTC Network Status" : "Сетевая статистика и параметры WebRTC"}</small>
             </div>
           </div>
           <button type="button" className="connectionInfoCloseBtn" onClick={onClose}>✕</button>
@@ -3655,17 +3984,33 @@ function SettingsModal({
   const streamRef = useRef<MediaStream | null>(null),
     loopbackGainRef = useRef<GainNode | null>(null),
     audioCtxRef = useRef<AudioContext | null>(null),
-    frameRef = useRef(0);
-  const list = async (requestPermission = false) => {
+    frameRef = useRef(0),
+    loopbackRef = useRef(loopback),
+    draftRef = useRef(draft);
+
+  useEffect(() => {
+    loopbackRef.current = loopback;
+  }, [loopback]);
+
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+
+  const list = async (forceRequest = false) => {
     try {
-      if (requestPermission) {
-        const temp = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: false,
-        });
-        temp.getTracks().forEach((track) => track.stop());
+      let devList = await navigator.mediaDevices.enumerateDevices();
+      const hasLabels = devList.some((d) => Boolean(d.label));
+      if (!hasLabels || forceRequest) {
+        try {
+          const temp = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+            video: false,
+          });
+          temp.getTracks().forEach((track) => track.stop());
+          devList = await navigator.mediaDevices.enumerateDevices();
+        } catch {}
       }
-      setDevices(await navigator.mediaDevices.enumerateDevices());
+      setDevices(devList);
       setDeviceError("");
     } catch {
       setDeviceError(
@@ -3681,33 +4026,47 @@ function SettingsModal({
     key: K,
     next: ClientSettings[K],
   ) => setDraft((current) => ({ ...current, [key]: next }));
-  const options = (kind: MediaDeviceKind) => [
-    { deviceId: "default", label: en ? "System default device" : "Системное устройство по умолчанию" },
-    ...devices
-      .filter((device) => device.kind === kind)
-      .map((device, index) => ({
-        deviceId: device.deviceId,
-        label:
-          device.label ||
-          `${kind === "audioinput" ? (en ? "Microphone" : "Микрофон") : kind === "audiooutput" ? (en ? "Speakers" : "Динамики") : en ? "Camera" : "Камера"} ${index + 1}`,
-      })),
-  ];
+  const options = (kind: MediaDeviceKind, selectedValue?: string) => {
+    const list = [
+      { deviceId: "default", label: en ? "System default device" : "Системное устройство по умолчанию" },
+      ...devices
+        .filter((device) => device.kind === kind)
+        .map((device, index) => ({
+          deviceId: device.deviceId,
+          label:
+            device.label ||
+            `${kind === "audioinput" ? (en ? "Microphone" : "Микрофон") : kind === "audiooutput" ? (en ? "Speakers" : "Динамики") : en ? "Camera" : "Камера"} ${index + 1}`,
+        })),
+    ];
+    if (selectedValue && selectedValue !== "default" && !list.some((o) => o.deviceId === selectedValue)) {
+      list.push({
+        deviceId: selectedValue,
+        label: `${en ? "Saved Device" : "Сохранённое устройство"} (${selectedValue.slice(0, 8)}…)`,
+      });
+    }
+    return list;
+  };
   function toggleLoopback() {
     const next = !loopback;
     setLoopback(next);
-    if (loopbackGainRef.current && audioCtxRef.current) {
-      loopbackGainRef.current.gain.setValueAtTime(next ? 1 : 0, audioCtxRef.current.currentTime);
+    loopbackRef.current = next;
+    if (loopbackGainRef.current && audioCtxRef.current && !next) {
+      loopbackGainRef.current.gain.setTargetAtTime(0, audioCtxRef.current.currentTime, 0.02);
     }
   }
   async function startTest() {
+    stopTest();
     try {
+      const audioConstraints: MediaTrackConstraints = {
+        noiseSuppression: draft.noiseSuppression,
+        echoCancellation: draft.echoCancellation,
+        autoGainControl: draft.autoGainControl,
+      };
+      if (draft.inputDevice && draft.inputDevice !== "default") {
+        audioConstraints.deviceId = { exact: draft.inputDevice };
+      }
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          deviceId: draft.inputDevice,
-          noiseSuppression: draft.noiseSuppression,
-          echoCancellation: draft.echoCancellation,
-          autoGainControl: draft.autoGainControl,
-        },
+        audio: audioConstraints,
         video: false,
       });
       streamRef.current = stream;
@@ -3717,37 +4076,50 @@ function SettingsModal({
       const analyser = context.createAnalyser();
       analyser.fftSize = 512;
       const loopbackGain = context.createGain();
-      loopbackGain.gain.value = loopback ? 1 : 0;
+      loopbackGain.gain.value = 0;
       loopbackGainRef.current = loopbackGain;
 
       source.connect(analyser);
       source.connect(loopbackGain);
       loopbackGain.connect(context.destination);
 
-      const data = new Uint8Array(analyser.frequencyBinCount);
+      const data = new Float32Array(analyser.fftSize);
       setTesting(true);
+      let smoothLevel = 0;
+      let speakingHoldUntil = 0;
+
       const tick = () => {
         if (context.state === "suspended") void context.resume();
-        analyser.getByteTimeDomainData(data);
+        analyser.getFloatTimeDomainData(data);
         let sum = 0;
-        for (const sample of data) {
-          const normalized = (sample - 128) / 128;
-          sum += normalized * normalized;
+        for (let i = 0; i < data.length; i++) {
+          sum += data[i] * data[i];
         }
         const rms = Math.sqrt(sum / data.length);
-        const currentLevel = Math.min(
-          100,
-          rms * 260 * (draft.inputVolume / 100),
-        );
-        setLevel(currentLevel);
+        const currentDraft = draftRef.current;
+        let rawLevel = 0;
+        if (rms > 0.0001) {
+          const dB = 20 * Math.log10(rms);
+          rawLevel = Math.max(0, Math.min(100, ((dB + 55) / 45) * 100)) * (currentDraft.inputVolume / 100);
+        }
+        if (rawLevel > smoothLevel) {
+          smoothLevel = rawLevel;
+        } else {
+          smoothLevel = smoothLevel * 0.82 + rawLevel * 0.18;
+        }
+        const displayLevel = Math.min(100, Math.max(0, smoothLevel));
+        setLevel(displayLevel);
 
-        const threshold = draft.autoThreshold ? 15 : draft.voiceThreshold;
+        const threshold = currentDraft.autoThreshold ? 15 : currentDraft.voiceThreshold;
+        const now = Date.now();
+        if (displayLevel >= threshold) {
+          speakingHoldUntil = now + 250;
+        }
+
         if (loopbackGainRef.current) {
-          if (loopback && currentLevel >= threshold) {
-            loopbackGainRef.current.gain.setValueAtTime(1, context.currentTime);
-          } else {
-            loopbackGainRef.current.gain.setValueAtTime(0, context.currentTime);
-          }
+          const isLoopbackActive = loopbackRef.current && (now < speakingHoldUntil);
+          const targetGain = isLoopbackActive ? Math.min(1, currentDraft.outputVolume / 100) : 0;
+          loopbackGainRef.current.gain.setTargetAtTime(targetGain, context.currentTime, 0.03);
         }
 
         frameRef.current = requestAnimationFrame(tick);
@@ -3758,13 +4130,19 @@ function SettingsModal({
     }
   }
   function stopTest() {
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-    cancelAnimationFrame(frameRef.current);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (frameRef.current) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = 0;
+    }
     if (audioCtxRef.current) {
-      void audioCtxRef.current.close();
+      void audioCtxRef.current.close().catch(() => {});
       audioCtxRef.current = null;
     }
+    loopbackGainRef.current = null;
     setTesting(false);
     setLevel(0);
   }
@@ -3818,19 +4196,22 @@ function SettingsModal({
               <SettingSelect
                 label={en ? "Microphone" : "Микрофон"}
                 value={draft.inputDevice}
-                options={options("audioinput")}
-                onChange={(next) => update("inputDevice", next)}
+                options={options("audioinput", draft.inputDevice)}
+                onChange={(next) => {
+                  update("inputDevice", next);
+                  if (testing) stopTest();
+                }}
               />
               <SettingSelect
                 label={en ? "Speakers / headphones" : "Динамики / наушники"}
                 value={draft.outputDevice}
-                options={options("audiooutput")}
+                options={options("audiooutput", draft.outputDevice)}
                 onChange={(next) => update("outputDevice", next)}
               />
               <SettingSelect
                 label={en ? "Camera" : "Камера"}
                 value={draft.cameraDevice}
-                options={options("videoinput")}
+                options={options("videoinput", draft.cameraDevice)}
                 onChange={(next) => update("cameraDevice", next)}
               />
               <button
